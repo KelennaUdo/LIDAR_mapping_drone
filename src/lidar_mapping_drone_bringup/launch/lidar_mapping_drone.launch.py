@@ -19,15 +19,19 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # Gazebo needs this so model://lidar_bot resolves to our local model.
+            # Gazebo needs this so model://x3_lidar resolves to our local model.
             SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", model_path),
 
             # Start Gazebo Sim. This is a normal process, not a ROS node.
             ExecuteProcess(
                 cmd=["gz", "sim", "-v", "4", "-r", world],
                 output="screen",
+                additional_env={
+                    "__NV_PRIME_RENDER_OFFLOAD": "1",
+                    "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+                    "__VK_LAYER_NV_optimus": "NVIDIA_only",
+                },
             ),
-
 
             # Bridge Gazebo /lidar2 into ROS 2 /laser_scan.
             Node(
@@ -37,27 +41,17 @@ def generate_launch_description():
                 output="screen",
             ),
 
-            # Publish the fixed transform RViz needs to place /laser_scan.
+            # Gazebo uses the SDF world name as the root pose frame. This
+            # identity transform only aliases that root to RViz's conventional
+            # "world" frame. The drone and LiDAR transforms remain dynamic.
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x",
-                    "0",
-                    "--y",
-                    "0",
-                    "--z",
-                    "0.38",
-                    "--roll",
-                    "0",
-                    "--pitch",
-                    "0",
-                    "--yaw",
-                    "0",
                     "--frame-id",
                     "world",
                     "--child-frame-id",
-                    "lidar_bot/lidar_link/lidar",
+                    "lidar_robot_world",
                 ],
                 output="screen",
             ),

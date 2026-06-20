@@ -1,6 +1,6 @@
 # LIDAR_mapping_drone
 
-ROS 2 Lyrical and Gazebo simulation for a robot-mounted planar LiDAR. The current pipeline launches Gazebo, bridges the simulated scan into ROS 2, publishes the required static transform, and visualizes the scan in RViz.
+ROS 2 Lyrical and Gazebo simulation for an X3 quadcopter with a body-mounted planar LiDAR. The pipeline launches Gazebo, bridges the simulated scan and moving poses into ROS 2, and visualizes the scan in RViz.
 
 ## Packages
 
