@@ -2,7 +2,7 @@
 
 This package owns launch files for the simulation.
 
-The simulation assets live in `lidar_mapping_drone_sim`; this package starts those assets with Gazebo, the ROS/Gazebo bridge, TF, and RViz.
+The simulation assets live in `lidar_mapping_drone_sim`; this package starts the X3 LiDAR drone in Gazebo, bridges its scan and moving poses into ROS 2, and opens RViz.
 
 ## Launch
 
