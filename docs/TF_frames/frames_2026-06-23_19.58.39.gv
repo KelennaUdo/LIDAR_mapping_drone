@@ -1,0 +1,15 @@
+digraph G {
+"x3_lidar/lidar_link" -> "x3_lidar/lidar_link/lidar"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/lidar_link"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"lidar_robot_world" -> "x3_lidar"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/X3/rotor_2"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/X3/rotor_1"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/X3/rotor_0"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/X3/base_link"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"x3_lidar" -> "x3_lidar/X3/rotor_3"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 1483.25\nOldest transform: 1478.252\n"];
+"world" -> "lidar_robot_world"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1782255519.1926446"[ shape=plaintext ] ;
+}->"world";
+}
