@@ -20,8 +20,8 @@ flight_controller:
     target_pitch_deg: 0.0
 
     xy_position_controller:
-      kp: 0.30
-      kd: 0.20
+      kp: 0.80
+      kd: 0.40
       max_accel_mps2: 1.0
       max_tilt_deg: 8.0
 
