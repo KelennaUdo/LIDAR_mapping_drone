@@ -37,6 +37,7 @@ def generate_launch_description():
             Node(
                 package="ros_gz_bridge",
                 executable="parameter_bridge",
+                name="lidarSensor_and_modelPose_bridge",
                 arguments=["--ros-args", "-p", ["config_file:=", bridge_config]],
                 output="screen",
             ),

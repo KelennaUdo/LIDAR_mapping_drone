@@ -36,6 +36,7 @@ def generate_launch_description():
             Node(
                 package="ros_gz_bridge",
                 executable="parameter_bridge",
+                name="motorCommand_bridge",
                 arguments=["--ros-args", "-p", ["config_file:=", motor_bridge_config]],
                 output="screen",
             ),
