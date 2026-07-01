@@ -8,5 +8,3 @@ __pycache__/
 
 bags/*
 !bags/.gitkeep
-
-tools/generated/

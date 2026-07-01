@@ -1,0 +1,67 @@
+digraph RosGzSystemGraph {
+  graph [rankdir=LR, bgcolor="white", pad="0.2", nodesep="0.65", ranksep="1.15", splines="ortho", label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><FONT POINT-SIZE="18"><B>LIDAR Mapping Drone Runtime Graph</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="14">Gazebo + ROS 2 Presentation View</FONT></TD></TR><TR><TD><TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#ffd166"><FONT POINT-SIZE="10">GZ topic</FONT></TD><TD BGCOLOR="#d0b3ff"><FONT POINT-SIZE="10">Bridge</FONT></TD><TD BGCOLOR="#b7e4c7"><FONT POINT-SIZE="10">ROS topic</FONT></TD><TD BGCOLOR="#90caf9"><FONT POINT-SIZE="10">ROS node</FONT></TD></TR></TABLE></TD></TR></TABLE>>, labelloc="t", labeljust="c", fontsize="18", fontname="DejaVu Sans"];
+  node [fontname="DejaVu Sans", fontsize="11", style="filled"];
+  edge [fontname="DejaVu Sans", fontsize="9", color="#555555", arrowsize="0.8"];
+
+  subgraph cluster_gazebo {
+    label="Gazebo Transport";
+    color="#f4a261";
+    style="rounded";
+    "gz_topic_lidar2" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/lidar2</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">gz.msgs.LaserScan</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#2a9d8f">sensor data out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#ffd166", color="#cc7a00"];
+    "gz_topic_model_x3_lidar_pose" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/model/x3_lidar/pose</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">gz.msgs.Pose_V</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d62828">pose feedback out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#ffd166", color="#cc7a00"];
+    "gz_topic_X3_gazebo_command_motor_speed" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/X3/gazebo/command/motor_speed</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">gz.msgs.Actuators</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d97706">motor command in</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#ffd166", color="#cc7a00"];
+  }
+
+  subgraph cluster_bridge {
+    label="Bridge";
+    color="#9d4edd";
+    style="rounded";
+    "bridge_ros_gz_bridge" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>ROS &lt;-&gt; Gazebo Bridge</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">LaserScan + TF + Motor Command</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#2a9d8f">sensor data in/out</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d62828">pose feedback in/out</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d97706">motor command in/out</FONT></TD></TR></TABLE>>, shape="box", fillcolor="#d0b3ff", color="#6a00a8"];
+  }
+
+  subgraph cluster_ros_topics {
+    label="ROS 2 Topics";
+    color="#2d6a4f";
+    style="rounded";
+    "ros_topic_laser_scan" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/laser_scan</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">sensor_msgs/msg/LaserScan</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#2a9d8f">sensor data in/out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+    "ros_topic_tf" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/tf</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">dynamic transforms</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">tf2_msgs/msg/TFMessage</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d62828">pose feedback in/out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+    "ros_topic_tf_static" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/tf_static</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">static transforms</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">tf2_msgs/msg/TFMessage</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">static transforms in</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+    "ros_topic_flight_controller_manual_reference_delta" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/flight_controller/manual_reference_delta</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">geometry_msgs/msg/Twist</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">manual reference in/out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+    "ros_topic_flight_controller_emergency_stop" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/flight_controller/emergency_stop</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">std_msgs/msg/Bool</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">emergency stop in/out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+    "ros_topic_X3_gazebo_command_motor_speed" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/X3/gazebo/command/motor_speed</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">actuator_msgs/msg/Actuators</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d97706">motor command in/out</FONT></TD></TR></TABLE>>, shape="ellipse", fillcolor="#b7e4c7", color="#2d6a4f"];
+  }
+
+  subgraph cluster_ros_nodes {
+    label="ROS 2 Nodes";
+    color="#1976d2";
+    style="rounded";
+    "ros_node_flight_controller" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/flight_controller</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">control node</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d97706">motor command out</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">emergency stop in</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">manual reference in</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#d62828">pose feedback in</FONT></TD></TR></TABLE>>, shape="box", fillcolor="#90caf9", color="#1565c0"];
+    "ros_node_keyboard_control" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/keyboard_control</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">manual input node</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">emergency stop out</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">manual reference out</FONT></TD></TR></TABLE>>, shape="box", fillcolor="#90caf9", color="#1565c0"];
+    "ros_node_rviz" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/rviz</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">visualization node</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#2a9d8f">sensor data in</FONT></TD></TR></TABLE>>, shape="box", fillcolor="#90caf9", color="#1565c0"];
+    "ros_node_static_transform_publisher_rWK277PnAnENlelW" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD><FONT POINT-SIZE="11"><B>/static_transform_publisher_rWK277PnAnENlelW</B></FONT></TD></TR><TR><TD><FONT POINT-SIZE="9">static TF node</FONT></TD></TR><TR><TD><FONT POINT-SIZE="9" COLOR="#6c757d">static transforms out</FONT></TD></TR></TABLE>>, shape="box", fillcolor="#90caf9", color="#1565c0"];
+  }
+
+  { rank=same; "gz_topic_lidar2"; "gz_topic_model_x3_lidar_pose"; "gz_topic_X3_gazebo_command_motor_speed"; }
+  { rank=same; "bridge_ros_gz_bridge"; }
+  { rank=same; "ros_topic_laser_scan"; "ros_topic_tf"; "ros_topic_tf_static"; "ros_topic_flight_controller_manual_reference_delta"; "ros_topic_flight_controller_emergency_stop"; "ros_topic_X3_gazebo_command_motor_speed"; }
+  { rank=same; "ros_node_flight_controller"; "ros_node_keyboard_control"; "ros_node_rviz"; "ros_node_static_transform_publisher_rWK277PnAnENlelW"; }
+  "gz_topic_lidar2" -> "bridge_ros_gz_bridge" [style="invis", weight="80"];
+  "bridge_ros_gz_bridge" -> "ros_topic_laser_scan" [style="invis", weight="80"];
+  "ros_topic_laser_scan" -> "ros_node_rviz" [style="invis", weight="80"];
+  "gz_topic_lidar2" -> "bridge_ros_gz_bridge" [color="#2a9d8f", penwidth="2.0", tooltip="/lidar2 -> ROS <-> Gazebo Bridge\nSignal: sensor data"];
+  "bridge_ros_gz_bridge" -> "ros_topic_laser_scan" [color="#2a9d8f", penwidth="2.0", tooltip="ROS <-> Gazebo Bridge -> /laser_scan\nSignal: sensor data"];
+  "gz_topic_model_x3_lidar_pose" -> "bridge_ros_gz_bridge" [color="#d62828", penwidth="2.6", tooltip="/model/x3_lidar/pose -> ROS <-> Gazebo Bridge\nSignal: pose feedback"];
+  "bridge_ros_gz_bridge" -> "ros_topic_tf" [color="#d62828", penwidth="2.6", tooltip="ROS <-> Gazebo Bridge -> /tf\nSignal: pose feedback"];
+  "ros_topic_X3_gazebo_command_motor_speed" -> "bridge_ros_gz_bridge" [color="#d97706", penwidth="2.6", constraint="false", tooltip="/X3/gazebo/command/motor_speed -> ROS <-> Gazebo Bridge\nSignal: motor command"];
+  "bridge_ros_gz_bridge" -> "gz_topic_X3_gazebo_command_motor_speed" [color="#d97706", penwidth="2.6", constraint="false", tooltip="ROS <-> Gazebo Bridge -> /X3/gazebo/command/motor_speed\nSignal: motor command"];
+  "ros_node_flight_controller" -> "ros_topic_X3_gazebo_command_motor_speed" [color="#d97706", penwidth="2.6", constraint="false", tooltip="/flight_controller -> /X3/gazebo/command/motor_speed\nSignal: motor command"];
+  "ros_topic_flight_controller_emergency_stop" -> "ros_node_flight_controller" [color="#6c757d", penwidth="1.8", tooltip="/flight_controller/emergency_stop -> /flight_controller\nSignal: emergency stop"];
+  "ros_topic_flight_controller_manual_reference_delta" -> "ros_node_flight_controller" [color="#6c757d", penwidth="1.8", tooltip="/flight_controller/manual_reference_delta -> /flight_controller\nSignal: manual reference"];
+  "ros_topic_tf" -> "ros_node_flight_controller" [color="#d62828", penwidth="2.6", tooltip="/tf -> /flight_controller\nSignal: pose feedback"];
+  "ros_node_keyboard_control" -> "ros_topic_flight_controller_emergency_stop" [color="#6c757d", penwidth="1.8", tooltip="/keyboard_control -> /flight_controller/emergency_stop\nSignal: emergency stop"];
+  "ros_node_keyboard_control" -> "ros_topic_flight_controller_manual_reference_delta" [color="#6c757d", penwidth="1.8", tooltip="/keyboard_control -> /flight_controller/manual_reference_delta\nSignal: manual reference"];
+  "ros_topic_laser_scan" -> "ros_node_rviz" [color="#2a9d8f", penwidth="2.0", tooltip="/laser_scan -> /rviz\nSignal: sensor data"];
+  "ros_node_static_transform_publisher_rWK277PnAnENlelW" -> "ros_topic_tf_static" [color="#6c757d", penwidth="1.8", tooltip="/static_transform_publisher_rWK277PnAnENlelW -> /tf_static\nSignal: static transforms"];
+  "ros_topic_tf" -> "ros_node_rviz" [color="#d62828", penwidth="2.6", tooltip="/tf -> /rviz\nSignal: pose feedback"];
+  "ros_topic_tf_static" -> "ros_node_rviz" [color="#6c757d", penwidth="1.8", tooltip="/tf_static -> /rviz\nSignal: static transforms"];
+}
