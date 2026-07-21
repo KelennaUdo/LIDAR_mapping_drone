@@ -20,11 +20,12 @@ from dataclasses import dataclass
 import rclpy
 from actuator_msgs.msg import Actuators
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 from rcl_interfaces.msg import SetParametersResult
 from rclpy._rclpy_pybind11 import RCLError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 
 from .altitude_controller import AltitudeController, AltitudeControllerConfig
 from .common import PIDGains, clamp, wrap_pi
@@ -39,7 +40,7 @@ from .outer_loop_xy_position_controller import (
     XYPositionControllerConfig,
 )
 from .safety_limiter import SafetyLimiter, SafetyLimiterConfig, zero_motor_command
-from .state_estimator import StateEstimator
+from .state_estimator import StateEstimator, quaternion_from_euler
 from .yaw_controller import YawController, YawControllerConfig
 
 
@@ -95,7 +96,15 @@ class FlightControllerNode(Node):
         self._state_estimator = StateEstimator(
             node=self,
             tf_topic=self._parameter_string("tf_topic"),
+            imu_topic=self._parameter_string("imu_topic"),
+            range_topic=self._parameter_string("range_topic"),
             tracked_child_frame=self._parameter_string("tracked_child_frame"),
+            imu_link_frame=self._parameter_string("imu_link_frame"),
+            range_link_frame=self._parameter_string("range_link_frame"),
+            ground_z_m=self._parameter_float("state_estimator.ground_z_m"),
+            vertical_velocity_filter_alpha=self._parameter_float(
+                "state_estimator.vertical_velocity_filter_alpha"
+            ),
         )
         self._outer_loop = OuterLoopXYPositionController(
             XYPositionControllerConfig(
@@ -192,6 +201,16 @@ class FlightControllerNode(Node):
             self._parameter_string("motor_command_topic"),
             10,
         )
+        self._estimated_state_pub = self.create_publisher(
+            Odometry,
+            self._parameter_string("estimated_state_topic"),
+            10,
+        )
+        self._estimator_status_pub = self.create_publisher(
+            String,
+            self._parameter_string("estimator_status_topic"),
+            10,
+        )
         self._manual_sub = self.create_subscription(
             Twist,
             self._parameter_string("manual_reference_delta_topic"),
@@ -219,7 +238,27 @@ class FlightControllerNode(Node):
         self.declare_parameter("mass_kg", 1.62)
         self.declare_parameter("gravity_mps2", 9.80665)
         self.declare_parameter("tf_topic", "/tf")
+        self.declare_parameter("imu_topic", "/x3_lidar/imu")
+        self.declare_parameter("range_topic", "/x3_lidar/range/down")
         self.declare_parameter("tracked_child_frame", "x3_lidar")
+        self.declare_parameter("imu_link_frame", "x3_lidar/imu_link")
+        self.declare_parameter(
+            "range_link_frame",
+            "x3_lidar/downward_range_link",
+        )
+        self.declare_parameter(
+            "estimated_state_topic",
+            "/flight_controller/estimated_state",
+        )
+        self.declare_parameter(
+            "estimator_status_topic",
+            "/flight_controller/estimator_status",
+        )
+        self.declare_parameter("state_estimator.ground_z_m", 0.0)
+        self.declare_parameter(
+            "state_estimator.vertical_velocity_filter_alpha",
+            0.25,
+        )
         self.declare_parameter(
             "motor_command_topic",
             "/X3/gazebo/command/motor_speed",
@@ -306,6 +345,7 @@ class FlightControllerNode(Node):
 
         state = self._state_estimator.state
         state_age_s = self._state_estimator.state_age_s(now_s)
+        self._publish_estimator_observability(state, now_s)
         if state is None:
             result = self._safety_limiter.apply(
                 zero_motor_command(),
@@ -435,6 +475,43 @@ class FlightControllerNode(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.velocity = command.as_velocity_list()
         self._motor_pub.publish(msg)
+
+    def _publish_estimator_observability(self, state, now_s: float) -> None:
+        status_msg = String()
+        status_msg.data = self._state_estimator.status_text(now_s)
+        self._estimator_status_pub.publish(status_msg)
+        if state is None:
+            return
+
+        msg = Odometry()
+        timestamp_sec = math.floor(state.timestamp_s)
+        timestamp_nanosec = round((state.timestamp_s - timestamp_sec) * 1.0e9)
+        if timestamp_nanosec >= 1_000_000_000:
+            timestamp_sec += 1
+            timestamp_nanosec = 0
+        msg.header.stamp.sec = timestamp_sec
+        msg.header.stamp.nanosec = timestamp_nanosec
+        msg.header.frame_id = state.parent_frame_id
+        msg.child_frame_id = state.child_frame_id
+        msg.pose.pose.position.x = state.x_m
+        msg.pose.pose.position.y = state.y_m
+        msg.pose.pose.position.z = state.z_m
+        orientation = quaternion_from_euler(
+            state.roll_rad,
+            state.pitch_rad,
+            state.yaw_rad,
+        )
+        msg.pose.pose.orientation.x = orientation[0]
+        msg.pose.pose.orientation.y = orientation[1]
+        msg.pose.pose.orientation.z = orientation[2]
+        msg.pose.pose.orientation.w = orientation[3]
+        msg.twist.twist.linear.x = state.vx_mps
+        msg.twist.twist.linear.y = state.vy_mps
+        msg.twist.twist.linear.z = state.vz_mps
+        msg.twist.twist.angular.x = state.roll_rate_radps
+        msg.twist.twist.angular.y = state.pitch_rate_radps
+        msg.twist.twist.angular.z = state.yaw_rate_radps
+        self._estimated_state_pub.publish(msg)
 
     def _log_safety_result(self, triggered: bool, reason: str) -> None:
         if triggered and reason != self._last_safety_reason:

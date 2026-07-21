@@ -42,6 +42,19 @@ ros2 topic echo /x3_lidar/range/down --once
 See [TELEMETRY_SENSORS.md](TELEMETRY_SENSORS.md) for sensor details, RViz
 setup, inspection commands, and rosbag recording.
 
+The flight controller now assembles its state from all three feedback paths:
+
+| State field | Source |
+| --- | --- |
+| `x`, `y`, `vx`, `vy` | Gazebo pose on `/tf` |
+| roll, pitch, yaw, angular rates | IMU on `/x3_lidar/imu` |
+| `z`, filtered `vz` | downward range on `/x3_lidar/range/down` |
+
+TF altitude and attitude remain available as simulation ground truth, but they
+are not copied into the controller state. See
+[HYBRID_STATE_ESTIMATOR.md](HYBRID_STATE_ESTIMATOR.md) for the estimator mental
+model, startup behavior, safety interaction, parameters, and test workflow.
+
 Controller and keyboard, in a second terminal after the base simulation is running:
 
 ```bash
@@ -118,6 +131,13 @@ This is an educational controller scaffold, not a tuned autopilot. Start with
 `altitude_only`, keep the configured safety limits conservative, and tune gains
 through `src/lidar_mapping_drone_control/config/flight_controller.yaml`.
 
+Inspect the exact hybrid state used by the controller:
+
+```bash
+ros2 topic echo /flight_controller/estimated_state --once
+ros2 topic echo /flight_controller/estimator_status
+```
+
 ## Telemetry Bag Example
 
 ```bash
@@ -128,7 +148,9 @@ ros2 bag record \
   /tf_static \
   /laser_scan \
   /x3_lidar/imu \
-  /x3_lidar/range/down
+  /x3_lidar/range/down \
+  /flight_controller/estimated_state \
+  /flight_controller/estimator_status
 ```
 
 Recorded bag contents under `bags/` are ignored by Git.

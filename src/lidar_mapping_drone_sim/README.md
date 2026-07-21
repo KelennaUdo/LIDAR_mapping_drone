@@ -64,7 +64,9 @@ ros2 bag record \
   /tf_static \
   /laser_scan \
   /x3_lidar/imu \
-  /x3_lidar/range/down
+  /x3_lidar/range/down \
+  /flight_controller/estimated_state \
+  /flight_controller/estimator_status
 ```
 
 See `TELEMETRY_SENSORS.md` in the repository root for the full telemetry map.

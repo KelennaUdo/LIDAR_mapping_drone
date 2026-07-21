@@ -6,11 +6,21 @@ flight_controller:
     gravity_mps2: 9.80665
 
     tf_topic: "/tf"
+    imu_topic: "/x3_lidar/imu"
+    range_topic: "/x3_lidar/range/down"
     tracked_child_frame: "x3_lidar"
+    imu_link_frame: "x3_lidar/imu_link"
+    range_link_frame: "x3_lidar/downward_range_link"
+    estimated_state_topic: "/flight_controller/estimated_state"
+    estimator_status_topic: "/flight_controller/estimator_status"
     motor_command_topic: "/X3/gazebo/command/motor_speed"
     manual_reference_delta_topic: "/flight_controller/manual_reference_delta"
     emergency_stop_topic: "/flight_controller/emergency_stop"
     emergency_stop: false
+
+    state_estimator:
+      ground_z_m: 0.0
+      vertical_velocity_filter_alpha: 0.25
 
     target_altitude_m: 1.0
     target_x_m: 0.0

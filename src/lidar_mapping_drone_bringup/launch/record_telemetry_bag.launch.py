@@ -11,6 +11,8 @@ TELEMETRY_TOPICS = [
     "/laser_scan",
     "/x3_lidar/imu",
     "/x3_lidar/range/down",
+    "/flight_controller/estimated_state",
+    "/flight_controller/estimator_status",
 ]
 
 

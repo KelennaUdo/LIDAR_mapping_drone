@@ -122,6 +122,7 @@ truth and compares it with:
 
 - IMU orientation and angular velocity on `/x3_lidar/imu`
 - downward range on `/x3_lidar/range/down`
+- the optional controller state on `/flight_controller/estimated_state`
 
 The range comparison reconstructs the range sensor's recorded TF pose and
 computes the expected intersection between its beam and the horizontal ground
@@ -181,8 +182,10 @@ The dashboard includes:
 - IMU linear acceleration
 - IMU orientation error against interpolated TF orientation
 - TF ground-truth XY path
+- hybrid controller altitude, attitude, and XY path when recorded
 - sample rates, valid range count, and RMS comparison errors
 
 The plot is only as complete as the bag. Missing IMU or range topics are marked
 in the dashboard, while a missing `x3_lidar` pose transform stops the analysis
-because there is no ground-truth reference.
+because there is no ground-truth reference. Bags recorded before the hybrid
+estimator was added still work; they simply omit the controller-state overlays.

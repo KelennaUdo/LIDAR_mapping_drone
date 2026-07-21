@@ -35,6 +35,8 @@ PRESENTATION_ROS_TOPICS = {
     "/X3/gazebo/command/motor_speed",
     "/flight_controller/manual_reference_delta",
     "/flight_controller/emergency_stop",
+    "/flight_controller/estimated_state",
+    "/flight_controller/estimator_status",
 }
 PRESENTATION_GZ_EXTRA_PATTERNS: tuple[re.Pattern[str], ...] = ()
 ROS_INTERNAL_TOPICS = {
@@ -57,6 +59,8 @@ FLOW_STYLES = {
     "motor command": {"color": "#d97706", "penwidth": "2.6"},
     "manual reference": {"color": "#6c757d", "penwidth": "1.8"},
     "emergency stop": {"color": "#6c757d", "penwidth": "1.8"},
+    "estimated state": {"color": "#d97706", "penwidth": "2.0"},
+    "estimator status": {"color": "#7b2cbf", "penwidth": "1.6", "style": "dashed"},
     "robot model": {"color": "#4d908e", "penwidth": "1.6", "style": "dashed"},
     "static transforms": {"color": "#6c757d", "penwidth": "1.8"},
     "visualization": {"color": "#6c757d", "penwidth": "1.5", "style": "dashed"},
@@ -1107,8 +1111,16 @@ def presentation_node_edge_label(node_name: str, topic: str, relation: str) -> s
     if "flight_controller" in lower:
         if relation == "subscribes" and topic == "/tf":
             return "pose feedback"
+        if relation == "subscribes" and topic == "/x3_lidar/imu":
+            return "imu telemetry"
+        if relation == "subscribes" and topic == "/x3_lidar/range/down":
+            return "downward range"
         if relation == "publishes" and topic == "/X3/gazebo/command/motor_speed":
             return "motor command"
+        if relation == "publishes" and topic == "/flight_controller/estimated_state":
+            return "estimated state"
+        if relation == "publishes" and topic == "/flight_controller/estimator_status":
+            return "estimator status"
         if relation == "subscribes" and topic == "/flight_controller/manual_reference_delta":
             return "manual reference"
         if relation == "subscribes" and topic == "/flight_controller/emergency_stop":

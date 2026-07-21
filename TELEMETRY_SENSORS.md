@@ -1,9 +1,9 @@
 # Telemetry Sensors
 
-This milestone adds simulated telemetry to the X3 LiDAR drone without changing
-the flight controller. The controller can keep using `/tf` for state feedback;
-the new topics are for inspection, logging, visualization, and future control
-work.
+This milestone adds simulated telemetry to the X3 LiDAR drone. The controller's
+hybrid state estimator now uses the IMU and downward range directly while
+retaining `/tf` for horizontal position. The sensor topics remain independently
+available for inspection, logging, and visualization.
 
 ## Mental Model
 
@@ -12,11 +12,12 @@ Gazebo sensor plugin
   -> Gazebo Transport topic
   -> ros_gz_bridge
   -> ROS 2 telemetry topic
-  -> RViz, rosbag, future estimators/controllers
+  -> hybrid state estimator, RViz, and rosbag
 ```
 
-The telemetry layer is additive. It does not command motors, tune gains, change
-controller modes, or replace the existing planar LiDAR and TF feedback paths.
+The telemetry layer does not command motors, tune gains, or change controller
+modes. It contributes measurements to the controller state while the existing
+controller blocks and motor path remain unchanged.
 
 ## Added Sensors
 
@@ -39,11 +40,11 @@ the ROS bridge currently reports `range: 11.0` while `max_range` is `10.0`.
 That value means there is no valid return; it does not mean the ground is
 11 metres away.
 
-Future estimator code must validate each reading against `min_range` and
-`max_range`. During controller startup, an invalid close-range reading can be
-handled as the expected landed state. After the first valid airborne reading,
-an invalid or stale range must be treated as a sensor fault instead of being
-interpreted as zero altitude.
+The hybrid estimator validates each reading against `min_range` and
+`max_range`. During startup, the expected invalid close-range reading selects a
+landed state with zero altitude and vertical speed. After the first valid
+airborne reading, the estimator latches its airborne phase; invalid or stale
+range then ages out and causes the existing safety limiter to stop the motors.
 
 ## Why These Sensors
 
@@ -57,9 +58,9 @@ chosen instead of a barometer or altimeter because the project needs a concrete
 ground-distance signal that is easy to inspect in Gazebo, RViz, and ROS bags.
 
 Important limitation: the range value is measured along the sensor beam. When
-the drone tilts, that raw range is not automatically vertical altitude. Future
-control or mapping code must combine the range reading with TF or IMU
-orientation to compute vertical height or a world-frame ground-hit point.
+the drone tilts, that raw range is not automatically vertical altitude. The
+hybrid estimator combines it with IMU orientation and the fixed range-sensor
+mount transform to calculate model altitude above a flat ground plane.
 
 ## Existing Paths Preserved
 
@@ -155,8 +156,14 @@ ros2 bag record \
   /tf_static \
   /laser_scan \
   /x3_lidar/imu \
-  /x3_lidar/range/down
+  /x3_lidar/range/down \
+  /flight_controller/estimated_state \
+  /flight_controller/estimator_status
 ```
+
+The two `/flight_controller/*` topics are present only while the controller is
+running. They record the exact hybrid state used by the controller and its
+`uninitialized`, `landed`, or `airborne` estimator status.
 
 Inspect and play it back:
 
@@ -191,15 +198,19 @@ Gazebo /x3_lidar/range/down
 
 ## Limitations
 
-- The controller does not consume `/x3_lidar/imu` or `/x3_lidar/range/down`
-  yet.
-- The IMU uses Gazebo's native simulated IMU output; no estimator has been
-  added yet.
+- The controller still uses Gazebo `/tf` for horizontal position and derives
+  horizontal velocity from consecutive TF samples.
+- The IMU and range data are idealized Gazebo sensor outputs; the estimator is
+  not a full inertial-navigation or sensor-fusion filter.
 - The downward range reading is along the beam direction, not vertical altitude
-  when the drone tilts.
+  when the drone tilts. The estimator corrects beam geometry but assumes a flat
+  ground plane at the configured `state_estimator.ground_z_m`.
 - The landed drone starts inside the range sensor's `0.05 m` blind zone, so the
   initial reading is intentionally invalid until the drone rises far enough.
 - The RViz robot model is a visual aid based on the Gazebo Fuel X3 meshes. It
   is still not a physics model.
 - The future 3D LiDAR mapping sensor is intentionally not part of this
   milestone.
+
+See [HYBRID_STATE_ESTIMATOR.md](HYBRID_STATE_ESTIMATOR.md) for the exact source
+mapping and controller behavior.

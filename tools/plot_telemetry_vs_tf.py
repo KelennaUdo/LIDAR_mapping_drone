@@ -18,6 +18,7 @@ import yaml
 TF_TOPIC = "/tf"
 IMU_TOPIC = "/x3_lidar/imu"
 RANGE_TOPIC = "/x3_lidar/range/down"
+ESTIMATED_STATE_TOPIC = "/flight_controller/estimated_state"
 MODEL_FRAME = "x3_lidar"
 RANGE_LINK_FRAME = "x3_lidar/downward_range_link"
 
@@ -48,6 +49,15 @@ class RangeSeries:
 
 
 @dataclass
+class EstimatedStateSeries:
+    time_ns: np.ndarray
+    position: np.ndarray
+    orientation: np.ndarray
+    linear_velocity: np.ndarray
+    angular_velocity: np.ndarray
+
+
+@dataclass
 class RigidTransform:
     translation: np.ndarray
     rotation: np.ndarray
@@ -58,6 +68,7 @@ class BagData:
     pose: PoseSeries
     imu: ImuSeries | None
     downward_range: RangeSeries | None
+    estimated_state: EstimatedStateSeries | None
     model_to_range: RigidTransform | None
 
 
@@ -278,6 +289,9 @@ def read_bag(bag: Path) -> BagData:
     pose_samples: list[tuple[int, np.ndarray, np.ndarray]] = []
     imu_samples: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, str]] = []
     range_samples: list[tuple[int, float, float, float, str]] = []
+    estimated_state_samples: list[
+        tuple[int, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    ] = []
     model_to_range: RigidTransform | None = None
 
     while reader.has_next():
@@ -285,7 +299,7 @@ def read_bag(bag: Path) -> BagData:
             topic, serialized, recorded_ns, _ = reader.read_next_ext()
         else:
             topic, serialized, recorded_ns = reader.read_next()
-        if topic not in {TF_TOPIC, IMU_TOPIC, RANGE_TOPIC}:
+        if topic not in {TF_TOPIC, IMU_TOPIC, RANGE_TOPIC, ESTIMATED_STATE_TOPIC}:
             continue
         message = deserialize_message(serialized, topic_types[topic])
         if topic == TF_TOPIC:
@@ -340,7 +354,7 @@ def read_bag(bag: Path) -> BagData:
                     message.header.frame_id,
                 )
             )
-        else:
+        elif topic == RANGE_TOPIC:
             sample_ns = stamp_to_ns(message.header.stamp, recorded_ns)
             range_samples.append(
                 (
@@ -349,6 +363,26 @@ def read_bag(bag: Path) -> BagData:
                     float(message.min_range),
                     float(message.max_range),
                     message.header.frame_id,
+                )
+            )
+        else:
+            sample_ns = stamp_to_ns(message.header.stamp, recorded_ns)
+            position = message.pose.pose.position
+            linear_velocity = message.twist.twist.linear
+            angular_velocity = message.twist.twist.angular
+            estimated_state_samples.append(
+                (
+                    sample_ns,
+                    np.array([position.x, position.y, position.z], dtype=float),
+                    quaternion(message.pose.pose.orientation),
+                    np.array(
+                        [linear_velocity.x, linear_velocity.y, linear_velocity.z],
+                        dtype=float,
+                    ),
+                    np.array(
+                        [angular_velocity.x, angular_velocity.y, angular_velocity.z],
+                        dtype=float,
+                    ),
                 )
             )
 
@@ -386,10 +420,28 @@ def read_bag(bag: Path) -> BagData:
             frame_id=range_samples[0][4],
         )
 
+    estimated_state = None
+    if estimated_state_samples:
+        estimated_state_samples.sort(key=lambda sample: sample[0])
+        estimated_state = EstimatedStateSeries(
+            time_ns=np.asarray(
+                [sample[0] for sample in estimated_state_samples], dtype=np.int64
+            ),
+            position=np.asarray([sample[1] for sample in estimated_state_samples]),
+            orientation=np.asarray([sample[2] for sample in estimated_state_samples]),
+            linear_velocity=np.asarray(
+                [sample[3] for sample in estimated_state_samples]
+            ),
+            angular_velocity=np.asarray(
+                [sample[4] for sample in estimated_state_samples]
+            ),
+        )
+
     return BagData(
         pose=pose,
         imu=imu,
         downward_range=downward_range,
+        estimated_state=estimated_state,
         model_to_range=model_to_range,
     )
 
@@ -466,6 +518,8 @@ def plot_dashboard(
         all_start_times.append(data.imu.time_ns[0])
     if data.downward_range is not None:
         all_start_times.append(data.downward_range.time_ns[0])
+    if data.estimated_state is not None:
+        all_start_times.append(data.estimated_state.time_ns[0])
     origin_ns = int(min(all_start_times))
 
     pose_time = relative_seconds(data.pose.time_ns, origin_ns)
@@ -488,6 +542,16 @@ def plot_dashboard(
         "alpha": 0.95,
         "zorder": 3,
     }
+    estimator_line_style = {
+        "color": "#d97706",
+        "linewidth": 1.6,
+        "linestyle": (0, (2, 2)),
+        "alpha": 0.95,
+        "zorder": 4,
+    }
+    estimator_time = None
+    if data.estimated_state is not None:
+        estimator_time = relative_seconds(data.estimated_state.time_ns, origin_ns)
 
     range_residual = None
     range_valid_count = 0
@@ -515,6 +579,13 @@ def plot_dashboard(
             linestyle=":",
             label="TF model z (different origin)",
         )
+        if data.estimated_state is not None:
+            axes[0].plot(
+                estimator_time,
+                data.estimated_state.position[:, 2],
+                label="Hybrid controller altitude",
+                **estimator_line_style,
+            )
         if data.model_to_range is not None:
             expected = predicted_range_from_tf(
                 data.pose, data.model_to_range, ground_z
@@ -558,6 +629,7 @@ def plot_dashboard(
         mark_unavailable(axes[1], "Range residual", f"Missing {RANGE_TOPIC}")
 
     attitude_error = None
+    estimator_attitude_error = None
     if data.imu is not None:
         imu_time = relative_seconds(data.imu.time_ns, origin_ns)
         imu_euler = quaternion_to_euler(data.imu.orientation)
@@ -649,9 +721,30 @@ def plot_dashboard(
         )
         attitude_error = quaternion_error_degrees(tf_at_imu, data.imu.orientation)
         axes[6].plot(
-            imu_time, attitude_error, color="#7b2cbf", linewidth=1.1
+            imu_time,
+            attitude_error,
+            color="#7b2cbf",
+            linewidth=1.1,
+            label="Raw IMU",
         )
-        configure_axis(axes[6], "IMU attitude error against TF", "rotation error (deg)")
+        if data.estimated_state is not None:
+            tf_at_estimate = interpolate_quaternions(
+                data.pose.time_ns,
+                data.pose.orientation,
+                data.estimated_state.time_ns,
+            )
+            estimator_attitude_error = quaternion_error_degrees(
+                tf_at_estimate,
+                data.estimated_state.orientation,
+            )
+            axes[6].plot(
+                estimator_time,
+                estimator_attitude_error,
+                label="Hybrid controller state",
+                **estimator_line_style,
+            )
+        configure_axis(axes[6], "Attitude error against TF", "rotation error (deg)")
+        axes[6].legend(loc="best")
     else:
         for index, title in (
             (2, "Roll and pitch"),
@@ -667,7 +760,15 @@ def plot_dashboard(
         data.pose.position[:, 1],
         color="#d62828",
         linewidth=1.5,
+        label="TF path",
     )
+    if data.estimated_state is not None:
+        axes[7].plot(
+            data.estimated_state.position[:, 0],
+            data.estimated_state.position[:, 1],
+            label="Hybrid controller path",
+            **estimator_line_style,
+        )
     axes[7].scatter(
         data.pose.position[0, 0],
         data.pose.position[0, 1],
@@ -702,11 +803,21 @@ def plot_dashboard(
             f"Range: {range_valid_count}/{len(data.downward_range.time_ns)} valid "
             f"at {series_rate_hz(data.downward_range.time_ns):.1f} Hz"
         )
+    if data.estimated_state is not None:
+        summary_parts.append(
+            f"Hybrid: {len(data.estimated_state.time_ns)} samples at "
+            f"{series_rate_hz(data.estimated_state.time_ns):.1f} Hz"
+        )
     if range_residual is not None:
         range_rms_mm = np.sqrt(np.mean(range_residual**2)) * 1000.0
         summary_parts.append(f"range RMS error: {range_rms_mm:.2f} mm")
     if attitude_error is not None:
         summary_parts.append(f"attitude RMS error: {np.sqrt(np.mean(attitude_error**2)):.3f} deg")
+    if estimator_attitude_error is not None:
+        summary_parts.append(
+            "hybrid attitude RMS: "
+            f"{np.sqrt(np.mean(estimator_attitude_error**2)):.3f} deg"
+        )
 
     figure.suptitle(
         "X3 LiDAR Drone Telemetry vs TF Ground Truth\n"
@@ -731,10 +842,16 @@ def plot_dashboard(
                 label="IMU measurement",
                 **imu_line_style,
             ),
+            Line2D(
+                [0],
+                [0],
+                label="Hybrid controller state",
+                **estimator_line_style,
+            ),
         ],
         loc="upper center",
         bbox_to_anchor=(0.5, 0.935),
-        ncols=2,
+        ncols=3,
         frameon=False,
     )
     figure.tight_layout(rect=(0.0, 0.0, 1.0, 0.91))
