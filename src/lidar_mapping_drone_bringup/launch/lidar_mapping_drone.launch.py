@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, SetEnvironmentVariable
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import Command, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -16,6 +17,9 @@ def generate_launch_description():
         [bringup_share, "config", "bridge_lidar.yaml"]
     )
     rviz_config = PathJoinSubstitution([sim_share, "rviz", "lidar_view.rviz"])
+    robot_description_file = PathJoinSubstitution(
+        [sim_share, "urdf", "x3_lidar.urdf"]
+    )
 
     return LaunchDescription(
         [
@@ -53,6 +57,23 @@ def generate_launch_description():
                     "world",
                     "--child-frame-id",
                     "lidar_robot_world",
+                ],
+                output="screen",
+            ),
+
+            # Publish a simple RViz-only robot_description. Gazebo continues to
+            # publish the moving x3_lidar TF frame used to place the model.
+            Node(
+                package="robot_state_publisher",
+                executable="robot_state_publisher",
+                name="x3_lidar_robot_state_publisher",
+                parameters=[
+                    {
+                        "robot_description": ParameterValue(
+                            Command(["cat ", robot_description_file]),
+                            value_type=str,
+                        )
+                    }
                 ],
                 output="screen",
             ),

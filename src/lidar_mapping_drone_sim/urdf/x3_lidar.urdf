@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<robot name="x3_lidar">
+  <!--
+    RViz visual model only. Gazebo remains the simulated plant and publishes
+    the moving TF frame named x3_lidar.
+  -->
+  <link name="x3_lidar">
+    <visual name="x3_body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://lidar_mapping_drone_sim/meshes/x3/x3.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+
+    <visual name="rotor_0_ccw">
+      <origin xyz="0.13 -0.22 0.023" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://lidar_mapping_drone_sim/meshes/x3/propeller_ccw.dae" scale="0.1 0.1 0.1"/>
+      </geometry>
+      <material name="propeller_blue">
+        <color rgba="0.1 0.24 0.9 0.85"/>
+      </material>
+    </visual>
+
+    <visual name="rotor_1_ccw">
+      <origin xyz="-0.13 0.20 0.023" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://lidar_mapping_drone_sim/meshes/x3/propeller_ccw.dae" scale="0.1 0.1 0.1"/>
+      </geometry>
+      <material name="propeller_red">
+        <color rgba="0.9 0.12 0.08 0.85"/>
+      </material>
+    </visual>
+
+    <visual name="rotor_2_cw">
+      <origin xyz="0.13 0.22 0.023" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://lidar_mapping_drone_sim/meshes/x3/propeller_cw.dae" scale="0.1 0.1 0.1"/>
+      </geometry>
+      <material name="propeller_blue"/>
+    </visual>
+
+    <visual name="rotor_3_cw">
+      <origin xyz="-0.13 -0.20 0.023" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://lidar_mapping_drone_sim/meshes/x3/propeller_cw.dae" scale="0.1 0.1 0.1"/>
+      </geometry>
+      <material name="propeller_red"/>
+    </visual>
+
+    <visual name="planar_lidar_sensor">
+      <origin xyz="0 0 0.10" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.055" length="0.04"/>
+      </geometry>
+      <material name="sensor_black">
+        <color rgba="0.02 0.02 0.02 1"/>
+      </material>
+    </visual>
+
+    <visual name="imu_sensor_marker">
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.035 0.028 0.010"/>
+      </geometry>
+      <material name="imu_blue">
+        <color rgba="0.1 0.35 0.9 1"/>
+      </material>
+    </visual>
+
+    <visual name="downward_range_sensor_marker">
+      <origin xyz="0 0 -0.04" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.03 0.02"/>
+      </geometry>
+      <material name="range_teal">
+        <color rgba="0.0 0.55 0.65 1"/>
+      </material>
+    </visual>
+  </link>
+</robot>

@@ -1,6 +1,6 @@
 # LIDAR_mapping_drone
 
-ROS 2 Lyrical and Gazebo simulation for an X3 quadcopter with a body-mounted planar LiDAR. The pipeline launches Gazebo, bridges the simulated scan and moving poses into ROS 2, and visualizes the scan in RViz.
+ROS 2 Lyrical and Gazebo simulation for an X3 quadcopter with a body-mounted planar LiDAR and simulated telemetry sensors. The pipeline launches Gazebo, bridges scans, telemetry, and moving poses into ROS 2, and visualizes the drone in RViz.
 
 ## Packages
 
@@ -29,6 +29,18 @@ Alternatively:
 ```bash
 ./src/run_lidar_mapping_drone.sh
 ```
+
+The base launch also starts the telemetry bridges and RViz model display.
+Expected inspection topics include:
+
+```bash
+ros2 topic list -t | grep -i -E "scan|imu|range|tf"
+ros2 topic echo /x3_lidar/imu --once
+ros2 topic echo /x3_lidar/range/down --once
+```
+
+See [TELEMETRY_SENSORS.md](TELEMETRY_SENSORS.md) for sensor details, RViz
+setup, inspection commands, and rosbag recording.
 
 Controller and keyboard, in a second terminal after the base simulation is running:
 
@@ -105,3 +117,18 @@ thrust_command + roll_torque_command + pitch_torque_command + yaw_torque_command
 This is an educational controller scaffold, not a tuned autopilot. Start with
 `altitude_only`, keep the configured safety limits conservative, and tune gains
 through `src/lidar_mapping_drone_control/config/flight_controller.yaml`.
+
+## Telemetry Bag Example
+
+```bash
+ros2 bag record \
+  -o bags/telemetry_sensors_test_01 \
+  --topics \
+  /tf \
+  /tf_static \
+  /laser_scan \
+  /x3_lidar/imu \
+  /x3_lidar/range/down
+```
+
+Recorded bag contents under `bags/` are ignored by Git.

@@ -92,6 +92,8 @@ The presentation view hides common ROS 2 and Gazebo boilerplate by default:
 It keeps the main project architecture visible:
 
 - Gazebo `/lidar2` -> `ros_gz_bridge` -> ROS `/laser_scan`
+- Gazebo `/x3_lidar/imu` -> `ros_gz_bridge` -> ROS `/x3_lidar/imu`
+- Gazebo `/x3_lidar/range/down` -> `ros_gz_bridge` -> ROS `/x3_lidar/range/down`
 - Gazebo `/model/x3_lidar/pose` -> `ros_gz_bridge` -> ROS `/tf`
 - ROS `/X3/gazebo/command/motor_speed` -> `ros_gz_bridge` -> Gazebo `/X3/gazebo/command/motor_speed`
 - running controller, keyboard, RViz, and static transform nodes when present
@@ -111,3 +113,76 @@ Topic labels keep full message type names and render topic name/type on separate
 ## Bridge YAML Assumptions
 
 The parser expects the current project format: a top-level list of bridge entries where each entry has scalar fields such as `ros_topic_name`, `gz_topic_name`, `ros_type_name`, `gz_type_name`, and `direction`.
+
+# Telemetry vs TF Plot Tool
+
+`plot_telemetry_vs_tf.py` turns a recorded telemetry bag into an offline sensor
+comparison dashboard. It treats the recorded Gazebo pose on `/tf` as ground
+truth and compares it with:
+
+- IMU orientation and angular velocity on `/x3_lidar/imu`
+- downward range on `/x3_lidar/range/down`
+
+The range comparison reconstructs the range sensor's recorded TF pose and
+computes the expected intersection between its beam and the horizontal ground
+plane. This is more accurate than treating raw beam range as if it were the
+drone model's world-frame altitude.
+
+The tool is read-only. It does not replay the bag, publish ROS topics, launch
+the simulation, or change the controller.
+
+## Plot a Bag
+
+Source ROS 2 and the workspace, then provide a rosbag directory:
+
+```bash
+cd ~/LIDAR_mapping_drone
+source /opt/ros/lyrical/setup.bash
+source install/setup.bash
+
+python3 tools/plot_telemetry_vs_tf.py \
+  bags/telemetry_sensors_20260705_160549
+```
+
+The default output is written inside the selected bag:
+
+```text
+bags/telemetry_sensors_20260705_160549/analysis/telemetry_vs_tf.png
+```
+
+Because the `bags/` directory is ignored by Git, generated analysis images are
+not committed.
+
+Open an interactive Matplotlib window as well as saving the image:
+
+```bash
+python3 tools/plot_telemetry_vs_tf.py BAG_DIRECTORY --show
+```
+
+Choose a different image path or format:
+
+```bash
+python3 tools/plot_telemetry_vs_tf.py BAG_DIRECTORY \
+  --output /tmp/telemetry_comparison.svg
+```
+
+If the simulated ground plane is not at world `z = 0`, provide its height:
+
+```bash
+python3 tools/plot_telemetry_vs_tf.py BAG_DIRECTORY --ground-z 0.25
+```
+
+The dashboard includes:
+
+- measured downward range, TF-derived expected beam range, and model TF `z`
+- range residual error
+- IMU and TF roll, pitch, and unwrapped yaw
+- IMU angular velocity and angular rates derived from TF
+- IMU linear acceleration
+- IMU orientation error against interpolated TF orientation
+- TF ground-truth XY path
+- sample rates, valid range count, and RMS comparison errors
+
+The plot is only as complete as the bag. Missing IMU or range topics are marked
+in the dashboard, while a missing `x3_lidar` pose transform stops the analysis
+because there is no ground-truth reference.

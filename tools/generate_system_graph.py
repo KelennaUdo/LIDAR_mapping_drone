@@ -21,12 +21,17 @@ from typing import Iterable
 DEFAULT_OUTPUT_NAME = "ros_gz_system_graph"
 IMPORTANT_GZ_TOPICS = {
     "/lidar2",
+    "/x3_lidar/imu",
+    "/x3_lidar/range/down",
     "/model/x3_lidar/pose",
     "/X3/gazebo/command/motor_speed",
 }
 PRESENTATION_ROS_TOPICS = {
     "/laser_scan",
+    "/x3_lidar/imu",
+    "/x3_lidar/range/down",
     "/tf",
+    "/robot_description",
     "/X3/gazebo/command/motor_speed",
     "/flight_controller/manual_reference_delta",
     "/flight_controller/emergency_stop",
@@ -46,10 +51,13 @@ PARAMETER_SERVICE_SUFFIXES = (
 )
 FLOW_STYLES = {
     "sensor data": {"color": "#2a9d8f", "penwidth": "2.0"},
+    "imu telemetry": {"color": "#4361ee", "penwidth": "2.0"},
+    "downward range": {"color": "#0096c7", "penwidth": "2.0"},
     "pose feedback": {"color": "#d62828", "penwidth": "2.6"},
     "motor command": {"color": "#d97706", "penwidth": "2.6"},
     "manual reference": {"color": "#6c757d", "penwidth": "1.8"},
     "emergency stop": {"color": "#6c757d", "penwidth": "1.8"},
+    "robot model": {"color": "#4d908e", "penwidth": "1.6", "style": "dashed"},
     "static transforms": {"color": "#6c757d", "penwidth": "1.8"},
     "visualization": {"color": "#6c757d", "penwidth": "1.5", "style": "dashed"},
 }
@@ -583,6 +591,7 @@ def is_main_project_node(node_name: str) -> bool:
         "flight_controller" in lower
         or "keyboard_control" in lower
         or "rviz" in lower
+        or "robot_state_publisher" in lower
         or "static_transform_publisher" in lower
         or is_bridge_node(node_name)
     )
@@ -869,14 +878,19 @@ def topic_sort_key(topic: str, options: GraphOptions, kind: str) -> tuple[int, s
         order = {
             "/lidar2": 10,
             "/lidar2/points": 15,
-            "/model/x3_lidar/pose": 20,
+            "/x3_lidar/imu": 20,
+            "/x3_lidar/range/down": 25,
+            "/model/x3_lidar/pose": 30,
             "/X3/gazebo/command/motor_speed": 90,
         }
     else:
         order = {
             "/laser_scan": 10,
-            "/tf": 20,
-            "/tf_static": 25,
+            "/x3_lidar/imu": 20,
+            "/x3_lidar/range/down": 25,
+            "/tf": 30,
+            "/tf_static": 35,
+            "/robot_description": 45,
             "/flight_controller/manual_reference_delta": 60,
             "/flight_controller/emergency_stop": 65,
             "/X3/gazebo/command/motor_speed": 90,
@@ -1066,6 +1080,8 @@ def presentation_node_role(node_name: str) -> str:
         return "manual input node"
     if "rviz" in lower:
         return "visualization node"
+    if "robot_state_publisher" in lower:
+        return "robot model publisher"
     if "static_transform_publisher" in lower:
         return "static TF node"
     return ""
@@ -1105,9 +1121,18 @@ def presentation_node_edge_label(node_name: str, topic: str, relation: str) -> s
     if "static_transform_publisher" in lower and relation == "publishes":
         if topic == "/tf_static":
             return "static transforms"
+    if "robot_state_publisher" in lower and relation == "publishes":
+        if topic == "/robot_description":
+            return "robot model"
     if "rviz" in lower and relation == "subscribes":
         if topic == "/laser_scan":
             return "sensor data"
+        if topic == "/x3_lidar/imu":
+            return "imu telemetry"
+        if topic == "/x3_lidar/range/down":
+            return "downward range"
+        if topic == "/robot_description":
+            return "robot model"
         if topic == "/tf":
             return "pose feedback"
         if topic == "/tf_static":
@@ -1143,6 +1168,10 @@ def service_action_edge_attrs(kind: str, relation: str, options: GraphOptions) -
 def presentation_bridge_label(mapping: BridgeMapping) -> str:
     if mapping.gz_topic_name == "/lidar2":
         return "sensor data"
+    if mapping.gz_topic_name == "/x3_lidar/imu":
+        return "imu telemetry"
+    if mapping.gz_topic_name == "/x3_lidar/range/down":
+        return "downward range"
     if mapping.gz_topic_name == "/model/x3_lidar/pose":
         return "pose feedback"
     if mapping.gz_topic_name == "/X3/gazebo/command/motor_speed":
@@ -1219,6 +1248,10 @@ def bridge_mapping_summary(render: RenderGraph) -> str:
     for mapping in render.bridge_mappings:
         if mapping.gz_topic_name == "/lidar2":
             descriptions.append("LaserScan")
+        elif mapping.gz_topic_name == "/x3_lidar/imu":
+            descriptions.append("IMU")
+        elif mapping.gz_topic_name == "/x3_lidar/range/down":
+            descriptions.append("Down Range")
         elif mapping.gz_topic_name == "/model/x3_lidar/pose":
             descriptions.append("TF")
         elif mapping.gz_topic_name == "/X3/gazebo/command/motor_speed":
@@ -1256,6 +1289,30 @@ def emit_presentation_inferred_edges(lines: list[str], render: RenderGraph, opti
                 node_id,
                 **presentation_flow_attrs("static transforms"),
                 **edge_tooltip_attrs("/tf_static", node_name, "static transforms"),
+            )
+        if "/x3_lidar/imu" in render.ros_topics:
+            emit_edge(
+                lines,
+                dot_id("ros_topic", "/x3_lidar/imu"),
+                node_id,
+                **presentation_flow_attrs("imu telemetry"),
+                **edge_tooltip_attrs("/x3_lidar/imu", node_name, "imu telemetry"),
+            )
+        if "/x3_lidar/range/down" in render.ros_topics:
+            emit_edge(
+                lines,
+                dot_id("ros_topic", "/x3_lidar/range/down"),
+                node_id,
+                **presentation_flow_attrs("downward range"),
+                **edge_tooltip_attrs("/x3_lidar/range/down", node_name, "downward range"),
+            )
+        if "/robot_description" in render.ros_topics:
+            emit_edge(
+                lines,
+                dot_id("ros_topic", "/robot_description"),
+                node_id,
+                **presentation_flow_attrs("robot model"),
+                **edge_tooltip_attrs("/robot_description", node_name, "robot model"),
             )
 
 

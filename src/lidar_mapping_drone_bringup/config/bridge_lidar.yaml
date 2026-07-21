@@ -4,6 +4,18 @@
   gz_type_name: "gz.msgs.LaserScan"
   direction: GZ_TO_ROS
 
+- ros_topic_name: "/x3_lidar/imu"
+  gz_topic_name: "/x3_lidar/imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/x3_lidar/range/down"
+  gz_topic_name: "/x3_lidar/range/down"
+  ros_type_name: "sensor_msgs/msg/Range"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
 # PosePublisher exposes moving poses; this bridge converts them into ROS TF.
 - ros_topic_name: "/tf"
   gz_topic_name: "/model/x3_lidar/pose"
