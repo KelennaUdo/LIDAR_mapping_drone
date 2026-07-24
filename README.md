@@ -1,156 +1,87 @@
-# LIDAR_mapping_drone
+# PX4 SITL
 
-ROS 2 Lyrical and Gazebo simulation for an X3 quadcopter with a body-mounted planar LiDAR and simulated telemetry sensors. The pipeline launches Gazebo, bridges scans, telemetry, and moving poses into ROS 2, and visualizes the drone in RViz.
+This branch is a focused learning environment for running PX4 SITL with the
+PX4-supported Gazebo X500 vehicle. PX4 and Gazebo run inside an Ubuntu 24.04
+Docker container while the computer continues to use Ubuntu 26.04.
 
-## Packages
+The custom X3 controller sandbox is preserved on the
+`feature/telemetry-sensors` branch. It is not part of this branch's runtime.
 
-- `lidar_mapping_drone_sim`: Gazebo model, world, and RViz assets.
-- `lidar_mapping_drone_bringup`: Runtime configuration and the combined launch file.
-- `lidar_mapping_drone_control`: Experimental block-structured flight controller for the X3 LiDAR drone.
+## Architecture
 
-## Build
-
-```bash
-source /opt/ros/lyrical/setup.bash
-colcon build --symlink-install
-source install/setup.bash
+```text
+ROS 2 Offboard node                 later checkpoint
+        |
+        v
+Micro XRCE-DDS Agent                later checkpoint
+        |
+        v
+PX4 SITL                            Ubuntu 24.04 Docker container
+        |
+        v
+Gazebo X500                         Ubuntu 24.04 Docker container
 ```
 
-## Run
+## Repository Contents
 
-Base LiDAR simulation only:
-
-```bash
-ros2 launch lidar_mapping_drone_bringup lidar_mapping_drone.launch.py
-```
-
-Alternatively:
-
-```bash
-./src/run_lidar_mapping_drone.sh
-```
-
-The base launch also starts the telemetry bridges and RViz model display.
-Expected inspection topics include:
-
-```bash
-ros2 topic list -t | grep -i -E "scan|imu|range|tf"
-ros2 topic echo /x3_lidar/imu --once
-ros2 topic echo /x3_lidar/range/down --once
-```
-
-See [TELEMETRY_SENSORS.md](TELEMETRY_SENSORS.md) for sensor details, RViz
-setup, inspection commands, and rosbag recording.
-
-The flight controller now assembles its state from all three feedback paths:
-
-| State field | Source |
+| Path | Purpose |
 | --- | --- |
-| `x`, `y`, `vx`, `vy` | Gazebo pose on `/tf` |
-| roll, pitch, yaw, angular rates | IMU on `/x3_lidar/imu` |
-| `z`, filtered `vz` | downward range on `/x3_lidar/range/down` |
+| `docker/px4/` | Builds the Ubuntu 24.04 PX4 dependency image |
+| `src/px4_sitl_bringup/` | ROS launch package and Docker runner |
+| `PX4_SETUP.md` | Architecture, storage, startup, and cleanup guide |
 
-TF altitude and attitude remain available as simulation ground truth, but they
-are not copied into the controller state. See
-[HYBRID_STATE_ESTIMATOR.md](HYBRID_STATE_ESTIMATOR.md) for the estimator mental
-model, startup behavior, safety interaction, parameters, and test workflow.
+PX4 source and build output are intentionally stored outside this repository:
 
-Controller and keyboard, in a second terminal after the base simulation is running:
+```text
+/mnt/px4-workspace/PX4-Autopilot
+```
+
+## Current Checkpoint
+
+- Docker Engine is installed and verified.
+- The Ubuntu 24.04 base image is available.
+- A 30 GB ext4 workspace filesystem exists on the external drive.
+- The workspace is mounted read-write at `/mnt/px4-workspace` and write-tested.
+- PX4 source has not been cloned.
+- The PX4 dependency image has not been built.
+- PX4 SITL and the Gazebo X500 have not been launched yet.
+
+See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
+small approval checkpoints so every installation and runtime step can be
+inspected and understood.
+
+## Run Commands
+
+After the source checkout and Docker image exist, the direct command will be:
+
+```bash
+PX4_SOURCE_DIR=/mnt/px4-workspace/PX4-Autopilot \
+  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+```
+
+The equivalent ROS 2 launch command will be:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
-./src/run_lidar_mapping_drone_control.sh
+
+ros2 launch px4_sitl_bringup px4_sitl.launch.py \
+  px4_source_dir:=/mnt/px4-workspace/PX4-Autopilot
 ```
 
-The controller script defaults to `manual_keyboard`. It starts the controller
-launch in the background and runs the keyboard node in the foreground so stdin
-works correctly.
+Neither command is expected to work until the remaining PX4 installation
+checkpoints are complete.
 
-Launch file equivalent for non-interactive controller testing:
+## Comparing With the X3 Sandbox
+
+Commit or stash work before changing branches, then use:
 
 ```bash
-ros2 launch lidar_mapping_drone_control flight_controller.launch.py
+git switch feature/telemetry-sensors
 ```
 
-Non-keyboard modes:
+Return to the PX4 branch with:
 
 ```bash
-./src/run_lidar_mapping_drone_control.sh mode:=altitude_only enable_keyboard:=false
+git switch feature/px4-sitl
 ```
-
-Keyboard commands:
-
-```text
-r/f  altitude reference up/down
-w/s  pitch reference forward/back
-a/d  roll reference left/right
-q/e  yaw reference left/right
-x    emergency stop
-c    clear emergency stop
-h    show help
-```
-
-Available controller modes:
-
-- `altitude_only`: altitude loop active, roll/pitch/yaw references held level.
-- `attitude_hold`: altitude plus roll/pitch/yaw loops active.
-- `position_hold`: full cascaded XY position -> pitch/roll -> motor mixer architecture.
-- `manual_keyboard`: terminal keys modify altitude, pitch, roll, and yaw references while the same controller blocks remain in the command path.
-
-## Flight Control Architecture
-
-The controller follows the block-level hover architecture described by Brian Douglas in MathWorks, "How Do You Get a Drone to Hover? | Drone Simulation and Control, Part 2" (published 12 Oct 2018): https://www.mathworks.com/videos/drone-simulation-and-control-part-2-how-do-you-get-a-drone-to-hover--1539323448303.html
-
-Implemented signal flow:
-
-```text
-position_reference
-  -> OuterLoopXYPositionController
-  -> reference_pitch_roll_angle
-
-reference_pitch_roll_angle + estimated_states
-  -> InnerLoopPitchRollController
-  -> pitch_torque_command, roll_torque_command
-
-yaw_reference + estimated_states
-  -> YawController
-  -> yaw_torque_command
-
-altitude_reference + estimated_states
-  -> AltitudeController
-  -> thrust_command
-
-thrust_command + roll_torque_command + pitch_torque_command + yaw_torque_command
-  -> MotorMixer
-  -> four rotor velocity commands
-  -> Gazebo /X3/gazebo/command/motor_speed
-```
-
-This is an educational controller scaffold, not a tuned autopilot. Start with
-`altitude_only`, keep the configured safety limits conservative, and tune gains
-through `src/lidar_mapping_drone_control/config/flight_controller.yaml`.
-
-Inspect the exact hybrid state used by the controller:
-
-```bash
-ros2 topic echo /flight_controller/estimated_state --once
-ros2 topic echo /flight_controller/estimator_status
-```
-
-## Telemetry Bag Example
-
-```bash
-ros2 bag record \
-  -o bags/telemetry_sensors_test_01 \
-  --topics \
-  /tf \
-  /tf_static \
-  /laser_scan \
-  /x3_lidar/imu \
-  /x3_lidar/range/down \
-  /flight_controller/estimated_state \
-  /flight_controller/estimator_status
-```
-
-Recorded bag contents under `bags/` are ignored by Git.

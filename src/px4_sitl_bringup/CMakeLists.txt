@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
-project(lidar_mapping_drone_bringup)
+project(px4_sitl_bringup)
 
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY config launch
+  DIRECTORY launch scripts
   DESTINATION share/${PROJECT_NAME}
 )
 
