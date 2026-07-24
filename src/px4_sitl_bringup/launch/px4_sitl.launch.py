@@ -23,7 +23,8 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "px4_source_dir",
                 default_value=EnvironmentVariable(
-                    "PX4_SOURCE_DIR", default_value=""
+                    "PX4_SOURCE_DIR",
+                    default_value="/mnt/px4-workspace/PX4-Autopilot",
                 ),
                 description="Mounted PX4-Autopilot checkout",
             ),

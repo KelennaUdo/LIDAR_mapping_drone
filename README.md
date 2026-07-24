@@ -39,11 +39,13 @@ PX4 source and build output are intentionally stored outside this repository:
 ## Current Checkpoint
 
 - Docker Engine is installed and verified.
+- NVIDIA Container Toolkit `1.19.1` is installed and registered with Docker.
+- Docker containers can access the NVIDIA RTX 4050.
 - The Ubuntu 24.04 base image is available.
 - A 30 GB ext4 workspace filesystem exists on the external drive.
 - The workspace is mounted read-write at `/mnt/px4-workspace` and write-tested.
-- PX4 source has not been cloned.
-- The PX4 dependency image has not been built.
+- PX4 `v1.17.0` and all 39 recursive submodules are checked out.
+- Docker image `px4-sitl:v1.17.0` is built.
 - PX4 SITL and the Gazebo X500 have not been launched yet.
 
 See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
@@ -55,8 +57,7 @@ inspected and understood.
 After the source checkout and Docker image exist, the direct command will be:
 
 ```bash
-PX4_SOURCE_DIR=/mnt/px4-workspace/PX4-Autopilot \
-  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
 ```
 
 The equivalent ROS 2 launch command will be:
@@ -65,12 +66,13 @@ The equivalent ROS 2 launch command will be:
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
 
-ros2 launch px4_sitl_bringup px4_sitl.launch.py \
-  px4_source_dir:=/mnt/px4-workspace/PX4-Autopilot
+ros2 launch px4_sitl_bringup px4_sitl.launch.py
 ```
 
-Neither command is expected to work until the remaining PX4 installation
-checkpoints are complete.
+Both commands default to `/mnt/px4-workspace/PX4-Autopilot`. Set
+`PX4_SOURCE_DIR` only when using a different checkout location.
+The shared runner requests the NVIDIA GPU for Gazebo, so direct and ROS launch
+startup use the same graphics configuration.
 
 ## Comparing With the X3 Sandbox
 

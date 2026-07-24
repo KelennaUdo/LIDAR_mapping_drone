@@ -4,13 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PX4_VERSION="${PX4_VERSION:-v1.17.0}"
 PX4_IMAGE="${PX4_IMAGE:-px4-sitl:${PX4_VERSION}}"
-PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-}"
-
-if [[ -z "$PX4_SOURCE_DIR" ]]; then
-  echo "PX4_SOURCE_DIR must point to the PX4-Autopilot checkout." >&2
-  echo "Example: PX4_SOURCE_DIR=/media/$USER/px4/PX4-Autopilot $0" >&2
-  exit 2
-fi
+PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-/mnt/px4-workspace/PX4-Autopilot}"
 
 if [[ "$(id -u)" == "0" ]]; then
   echo "Run this script as your normal user, not as root." >&2
@@ -19,7 +13,8 @@ if [[ "$(id -u)" == "0" ]]; then
 fi
 
 if [[ ! -d "$PX4_SOURCE_DIR/.git" ]]; then
-  echo "Not a Git checkout: $PX4_SOURCE_DIR" >&2
+  echo "PX4 checkout not found: $PX4_SOURCE_DIR" >&2
+  echo "Mount the external workspace or override PX4_SOURCE_DIR." >&2
   exit 2
 fi
 

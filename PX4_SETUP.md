@@ -30,12 +30,14 @@ normal UDP ports without a large port-mapping list.
 | Item | Status |
 | --- | --- |
 | Docker Engine on Ubuntu 26.04 | Verified, version 29.6.2 |
+| NVIDIA Container Toolkit | Verified, version 1.19.1 |
+| NVIDIA GPU access from Docker | Verified, RTX 4050 visible |
 | Ubuntu 24.04 base image | Verified |
 | PX4 branch | `feature/px4-sitl` |
 | PX4 release selected | Stable `v1.17.0` |
 | External ext4 workspace | Mounted read-write at `/mnt/px4-workspace` and write-tested |
-| PX4 source checkout | Not started |
-| PX4 dependency image | Not built yet |
+| PX4 source checkout | `v1.17.0`, 39 recursive submodules verified |
+| PX4 dependency image | `px4-sitl:v1.17.0` built |
 | X500 SITL flight | Not tested yet |
 | ROS 2 communication | Later checkpoint |
 | ROS 2 Offboard example | Later checkpoint |
@@ -134,7 +136,7 @@ git -C "$PX4_SOURCE_DIR" submodule status --recursive
 ## Build the Dependency Image
 
 ```bash
-PX4_SOURCE_DIR="$PX4_SOURCE_DIR" ./docker/px4/build_image.sh
+./docker/px4/build_image.sh
 ```
 
 The build script refuses to continue when the checkout is not exactly
@@ -153,15 +155,13 @@ The shell script is preferred for the first flight because it preserves the
 interactive PX4 console:
 
 ```bash
-PX4_SOURCE_DIR="$PX4_SOURCE_DIR" \
-  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
 ```
 
 Headless operation omits the Gazebo window:
 
 ```bash
-PX4_SOURCE_DIR="$PX4_SOURCE_DIR" HEADLESS=1 \
-  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+HEADLESS=1 ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
 ```
 
 ROS launch equivalent:
@@ -169,9 +169,11 @@ ROS launch equivalent:
 ```bash
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
-ros2 launch px4_sitl_bringup px4_sitl.launch.py \
-  px4_source_dir:="$PX4_SOURCE_DIR"
+ros2 launch px4_sitl_bringup px4_sitl.launch.py
 ```
+
+These commands default to `/mnt/px4-workspace/PX4-Autopilot`. Override
+`PX4_SOURCE_DIR` only when using a different checkout location.
 
 The expected underlying PX4 build target is:
 
@@ -184,11 +186,26 @@ make px4_sitl gz_x500
 - Host networking exposes PX4's normal QGroundControl, MAVSDK, and uXRCE-DDS
   UDP traffic directly on the host.
 - The Gazebo GUI uses the host's X11/XWayland socket and display authorization.
+- The runner requests Docker's NVIDIA runtime and all available NVIDIA GPUs.
+- NVIDIA graphics, display, utility, and compute driver capabilities are
+  exposed to the container.
+- PRIME render-offload variables select the NVIDIA GPU on this hybrid
+  Intel/NVIDIA laptop.
 - Available `/dev/dri` graphics devices are passed through to the container.
 - Set `HEADLESS=1` if GUI forwarding is unavailable.
 
-These paths have not yet been validated on this computer. The first X500
-checkpoint will test graphics before attempting flight.
+Docker access to the RTX 4050 has been verified with:
+
+```bash
+sudo docker run --rm \
+  --runtime=nvidia \
+  --gpus all \
+  ubuntu:24.04 \
+  nvidia-smi
+```
+
+The first X500 checkpoint will confirm that the running Gazebo process is
+actively using the GPU before attempting flight.
 
 ## Comparing With the X3 Workflow
 
