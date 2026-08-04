@@ -3,7 +3,7 @@
 <package format="3">
   <name>px4_sitl_bringup</name>
   <version>0.0.1</version>
-  <description>Launch support for Docker-based PX4 SITL.</description>
+  <description>Launch support for PX4 SITL, DDS, Gazebo, and QGroundControl.</description>
   <maintainer email="kelenna@example.com">kelenna-udo</maintainer>
   <license>MIT</license>
 

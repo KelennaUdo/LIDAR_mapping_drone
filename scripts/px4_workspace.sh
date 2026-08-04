@@ -11,14 +11,15 @@ WORKSPACE_MOUNT="/mnt/px4-workspace"
 AUTO_WORKSPACE_MOUNT="/run/media/$USER/PX4_WORKSPACE"
 PX4_CHECKOUT="$WORKSPACE_MOUNT/PX4-Autopilot"
 PX4_CONTAINER="px4-sitl"
+DDS_AGENT_CONTAINER="px4-dds-agent"
 
 usage() {
   cat <<EOF
 Usage: $0 <connect|status|disconnect>
 
   connect     Mount the Seagate drive and virtual PX4 workspace safely.
-  status      Inspect the drives, PX4 checkout, and container without changing them.
-  disconnect  Stop PX4 with confirmation, unmount both filesystems, and eject the drive.
+  status      Inspect the drives, PX4 checkout, and containers without changing them.
+  disconnect  Stop PX4 services with confirmation, unmount both filesystems, and eject the drive.
 EOF
 }
 
@@ -92,17 +93,21 @@ release_workspace_loop() {
 }
 
 container_id() {
+  local container_name="$1"
+
   if docker ps >/dev/null 2>&1; then
-    docker ps -q --filter "name=^/${PX4_CONTAINER}$"
+    docker ps -q --filter "name=^/${container_name}$"
   elif sudo -n docker ps >/dev/null 2>&1; then
-    sudo -n docker ps -q --filter "name=^/${PX4_CONTAINER}$"
+    sudo -n docker ps -q --filter "name=^/${container_name}$"
   else
     return 2
   fi
 }
 
 container_id_with_sudo() {
-  sudo docker ps -q --filter "name=^/${PX4_CONTAINER}$"
+  local container_name="$1"
+
+  sudo docker ps -q --filter "name=^/${container_name}$"
 }
 
 print_status() {
@@ -111,10 +116,12 @@ print_status() {
   local seagate_state="not connected"
   local workspace_state="not mounted"
   local checkout_state="not available"
-  local container_state="unknown (run with cached sudo credentials)"
+  local px4_container_state="unknown (run with cached sudo credentials)"
+  local agent_container_state="unknown (run with cached sudo credentials)"
   local ready_state="no"
   local unplug_state="no"
-  local id=""
+  local px4_id=""
+  local agent_id=""
 
   device="$(physical_device)"
   if [[ -n "$device" ]]; then
@@ -144,31 +151,42 @@ print_status() {
     checkout_state="found at $PX4_CHECKOUT"
   fi
 
-  if id="$(container_id 2>/dev/null)"; then
-    if [[ -n "$id" ]]; then
-      container_state="running ($id)"
+  if px4_id="$(container_id "$PX4_CONTAINER" 2>/dev/null)"; then
+    if [[ -n "$px4_id" ]]; then
+      px4_container_state="running ($px4_id)"
     else
-      container_state="not running"
+      px4_container_state="not running"
+    fi
+  fi
+
+  if agent_id="$(container_id "$DDS_AGENT_CONTAINER" 2>/dev/null)"; then
+    if [[ -n "$agent_id" ]]; then
+      agent_container_state="running ($agent_id)"
+    else
+      agent_container_state="not running"
     fi
   fi
 
   if [[ "$seagate_state" == mounted\ read-write* \
     && "$workspace_state" == mounted\ read-write* \
     && "$checkout_state" == found* \
-    && "$container_state" == "not running" ]]; then
+    && "$px4_container_state" == "not running" \
+    && "$agent_container_state" == "not running" ]]; then
     ready_state="yes"
   fi
 
   if [[ -z "$seagate_mount" \
     && "$workspace_state" == "not mounted" \
-    && "$container_state" == "not running" ]]; then
+    && "$px4_container_state" == "not running" \
+    && "$agent_container_state" == "not running" ]]; then
     unplug_state="yes"
   fi
 
   printf '%-24s %s\n' "Seagate:" "$seagate_state"
   printf '%-24s %s\n' "Virtual PX4 drive:" "$workspace_state"
   printf '%-24s %s\n' "PX4 checkout:" "$checkout_state"
-  printf '%-24s %s\n' "PX4 container:" "$container_state"
+  printf '%-24s %s\n' "PX4 container:" "$px4_container_state"
+  printf '%-24s %s\n' "DDS Agent container:" "$agent_container_state"
   printf '%-24s %s\n' "Ready to launch PX4:" "$ready_state"
   printf '%-24s %s\n' "Safe to unplug:" "$unplug_state"
 }
@@ -188,15 +206,22 @@ connect_workspace() {
   local device=""
   local seagate_mount=""
   local image_path=""
-  local running_id=""
+  local px4_running_id=""
+  local agent_running_id=""
   local loop_device=""
   local loop_read_only=""
 
   sudo -v
 
-  running_id="$(container_id_with_sudo)"
-  if [[ -n "$running_id" ]]; then
-    echo "PX4 container is already running: $running_id" >&2
+  px4_running_id="$(container_id_with_sudo "$PX4_CONTAINER")"
+  agent_running_id="$(container_id_with_sudo "$DDS_AGENT_CONTAINER")"
+  if [[ -n "$px4_running_id" || -n "$agent_running_id" ]]; then
+    if [[ -n "$px4_running_id" ]]; then
+      echo "PX4 container is already running: $px4_running_id" >&2
+    fi
+    if [[ -n "$agent_running_id" ]]; then
+      echo "DDS Agent container is already running: $agent_running_id" >&2
+    fi
     echo "Use '$0 status' instead of changing mounts." >&2
     exit 2
   fi
@@ -300,29 +325,44 @@ connect_workspace() {
 disconnect_workspace() {
   local device=""
   local seagate_mount=""
-  local running_id=""
+  local px4_running_id=""
+  local agent_running_id=""
   local answer=""
   local parent_name=""
   local parent_device=""
 
   sudo -v
 
-  running_id="$(container_id_with_sudo)"
-  if [[ -n "$running_id" ]]; then
+  px4_running_id="$(container_id_with_sudo "$PX4_CONTAINER")"
+  agent_running_id="$(container_id_with_sudo "$DDS_AGENT_CONTAINER")"
+  if [[ -n "$px4_running_id" || -n "$agent_running_id" ]]; then
     if [[ ! -t 0 ]]; then
-      echo "PX4 is running. Re-run interactively to confirm shutdown." >&2
+      echo "PX4 services are running. Re-run interactively to confirm shutdown." >&2
       exit 2
     fi
 
-    printf 'PX4 container is running. Stop it now? [y/N] '
+    echo "Running PX4 services:"
+    if [[ -n "$agent_running_id" ]]; then
+      echo "  DDS Agent: $agent_running_id"
+    fi
+    if [[ -n "$px4_running_id" ]]; then
+      echo "  PX4 SITL:   $px4_running_id"
+    fi
+    printf 'Stop them now? [y/N] '
     read -r answer
     if [[ ! "$answer" =~ ^[Yy]$ ]]; then
       echo "Disconnect cancelled. The drive remains mounted."
       exit 2
     fi
 
-    echo "Stopping PX4 container"
-    sudo docker stop --timeout 30 "$PX4_CONTAINER"
+    if [[ -n "$agent_running_id" ]]; then
+      echo "Stopping DDS Agent container"
+      sudo docker stop --timeout 10 "$DDS_AGENT_CONTAINER"
+    fi
+    if [[ -n "$px4_running_id" ]]; then
+      echo "Stopping PX4 container"
+      sudo docker stop --timeout 30 "$PX4_CONTAINER"
+    fi
   fi
 
   unmount_workspace_locations

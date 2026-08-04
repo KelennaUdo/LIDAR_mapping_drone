@@ -10,16 +10,18 @@ The custom X3 controller sandbox is preserved on the
 ## Architecture
 
 ```text
-ROS 2 Offboard node                 later checkpoint
+ROS 2 telemetry                     Ubuntu 26.04 host
         |
         v
-Micro XRCE-DDS Agent                later checkpoint
+Micro XRCE-DDS Agent                Ubuntu 24.04 Docker container
         |
         v
 PX4 SITL                            Ubuntu 24.04 Docker container
         |
         v
 Gazebo X500                         Ubuntu 24.04 Docker container
+
+QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
 ```
 
 ## Repository Contents
@@ -46,7 +48,10 @@ PX4 source and build output are intentionally stored outside this repository:
 - The workspace is mounted read-write at `/mnt/px4-workspace` and write-tested.
 - PX4 `v1.17.0` and all 39 recursive submodules are checked out.
 - Docker image `px4-sitl:v1.17.0` is built.
-- PX4 SITL and the Gazebo X500 have not been launched yet.
+- PX4 SITL and the Gazebo X500 launch and fly under QGroundControl.
+- Micro XRCE-DDS Agent `v2.4.3` is built.
+- `px4_msgs release/1.17` is built for ROS 2 Lyrical.
+- Read-only `/fmu/out/...` telemetry is verified in ROS 2.
 
 See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
 small approval checkpoints so every installation and runtime step can be
@@ -54,25 +59,25 @@ inspected and understood.
 
 ## Run Commands
 
-After the source checkout and Docker image exist, the direct command will be:
+Connect the external workspace, then start the complete PX4 session:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+./scripts/px4_workspace.sh connect
+./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
-The equivalent ROS 2 launch command will be:
+The launcher starts the DDS Agent, QGroundControl, PX4 SITL, and Gazebo. The
+equivalent ROS 2 launch command is:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
 
-ros2 launch px4_sitl_bringup px4_sitl.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py
 ```
 
-Both commands default to `/mnt/px4-workspace/PX4-Autopilot`. Set
-`PX4_SOURCE_DIR` only when using a different checkout location.
-The shared runner requests the NVIDIA GPU for Gazebo, so direct and ROS launch
-startup use the same graphics configuration.
+Both commands use the same shell supervisor and request the NVIDIA GPU for
+Gazebo. Press `Ctrl+C` in the launch terminal to stop the complete session.
 
 ## Comparing With the X3 Sandbox
 

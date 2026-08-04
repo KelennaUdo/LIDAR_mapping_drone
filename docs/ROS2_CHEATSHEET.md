@@ -176,10 +176,10 @@ ros2 param set /node_name parameter_name value
 ros2 launch package_name file.launch.py --show-args
 
 # Launch the project's PX4 runner through ROS 2.
-ros2 launch px4_sitl_bringup px4_sitl.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py
 
 # Override a declared launch argument.
-ros2 launch px4_sitl_bringup px4_sitl.launch.py headless:=1
+ros2 launch px4_sitl_bringup px4.launch.py headless:=1
 ```
 
 ## TF Transforms

@@ -8,9 +8,11 @@ instead of on a physical flight controller.
 ```text
 Project runner
     ↓
-Ubuntu 24.04 Docker container
-├── PX4 SITL: flight-control software
-└── Gazebo X500: simulated vehicle and physical world
+├── Micro XRCE-DDS Agent: PX4-to-ROS 2 communication
+├── QGroundControl: host supervision application
+└── Ubuntu 24.04 Docker container
+    ├── PX4 SITL: flight-control software
+    └── Gazebo X500: simulated vehicle and physical world
 ```
 
 PX4 and Gazebo use the external source checkout:
@@ -40,6 +42,7 @@ Seagate:                 mounted read-write
 Virtual PX4 drive:       mounted read-write
 PX4 checkout:            found
 PX4 container:           not running
+DDS Agent container:     not running
 Ready to launch PX4:     yes
 ```
 
@@ -65,8 +68,8 @@ sudo docker ps --filter name=px4-sitl
 Run from the repository root:
 
 ```bash
-# Start PX4 SITL and the Gazebo X500 with the interactive PX4 console.
-./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+# Start the Agent, QGroundControl, PX4 SITL, and the Gazebo X500.
+./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
 The runner defaults to:
@@ -95,7 +98,7 @@ Headless mode runs without the Gazebo graphical window:
 
 ```bash
 # Useful for automated tests or systems without a display.
-HEADLESS=1 ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+HEADLESS=1 ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
 The simulation server can still use graphics hardware for simulated rendering
@@ -111,15 +114,15 @@ source /opt/ros/lyrical/setup.bash
 source install/setup.bash
 
 # Start the same PX4/Gazebo workflow through ROS launch.
-ros2 launch px4_sitl_bringup px4_sitl.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py
 ```
 
 ```bash
 # Inspect available launch arguments without starting PX4.
-ros2 launch px4_sitl_bringup px4_sitl.launch.py --show-args
+ros2 launch px4_sitl_bringup px4.launch.py --show-args
 
 # Start without a Gazebo GUI.
-ros2 launch px4_sitl_bringup px4_sitl.launch.py headless:=1
+ros2 launch px4_sitl_bringup px4.launch.py headless:=1
 ```
 
 ## Optional Overrides
@@ -129,11 +132,11 @@ Defaults should be used for the current learning checkpoint:
 ```bash
 # Example: select a different Gazebo world for one launch.
 PX4_GZ_WORLD=example_world \
-  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
 
 # Example: use a PX4 checkout stored somewhere else.
 PX4_SOURCE_DIR=/another/path/PX4-Autopilot \
-  ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
 An override changes only that command's environment. It does not edit the
@@ -146,6 +149,12 @@ Use a second terminal while PX4 is running:
 ```bash
 # Confirm that the PX4 container exists.
 sudo docker ps --filter name=px4-sitl
+
+# Confirm that the DDS Agent container exists.
+sudo docker ps --filter name=px4-dds-agent
+
+# Follow DDS Agent connection logs. Press Ctrl+C to stop watching.
+sudo docker logs --follow px4-dds-agent
 
 # Show CPU and memory usage.
 sudo docker stats px4-sitl
@@ -163,9 +172,9 @@ sudo docker exec -it px4-sitl bash
 ## Safe Shutdown
 
 ```bash
-# Preferred: press Ctrl+C in the original PX4 launch terminal.
+# Preferred: press Ctrl+C in the original launcher terminal.
 
-# Stop PX4 if necessary, unmount both filesystems, and eject the drive.
+# Stop both containers if necessary, unmount both filesystems, and eject.
 ./scripts/px4_workspace.sh disconnect
 ```
 
@@ -193,15 +202,15 @@ Available now:
 PX4 v1.17.0 SITL
 Gazebo X500
 NVIDIA GPU access
-Direct and ROS launch wrappers
+Micro XRCE-DDS Agent v2.4.3
+px4_msgs release/1.17
+Read-only ROS 2 telemetry
+Single shell and ROS launch workflow
 ```
 
 Later checkpoints:
 
 ```text
-Micro XRCE-DDS Agent
-px4_msgs matching PX4 v1.17
-ROS 2 PX4 telemetry
 ROS 2 Offboard control example
 ```
 

@@ -12,13 +12,15 @@ X500. The custom-controller X3 sandbox is preserved separately on the
 ROS 2 Offboard node                 later checkpoint
         |
         v
-Micro XRCE-DDS Agent                later checkpoint
+Micro XRCE-DDS Agent v2.4.3         Docker, UDP 8888
         |
         v UDP 8888
 PX4 SITL                            Docker, Ubuntu 24.04
         |
         v Gazebo Transport
 Gazebo Harmonic X500                Docker, Ubuntu 24.04
+
+QGroundControl                      Host, MAVLink supervision
 ```
 
 Docker is the isolation boundary. The container uses Ubuntu 24.04 packages,
@@ -38,8 +40,10 @@ normal UDP ports without a large port-mapping list.
 | External ext4 workspace | Mounted read-write at `/mnt/px4-workspace` and write-tested |
 | PX4 source checkout | `v1.17.0`, 39 recursive submodules verified |
 | PX4 dependency image | `px4-sitl:v1.17.0` built |
-| X500 SITL flight | Not tested yet |
-| ROS 2 communication | Later checkpoint |
+| X500 SITL flight | Arm, takeoff, hover, and land verified |
+| Micro XRCE-DDS Agent | `v2.4.3` built and connected |
+| PX4 ROS interfaces | `px4_msgs release/1.17` built with ROS 2 Lyrical |
+| ROS 2 communication | Read-only `/fmu/out/...` telemetry verified |
 | ROS 2 Offboard example | Later checkpoint |
 
 ## Why This Uses a Source Checkout
@@ -85,9 +89,9 @@ while the container is running.
 | --- | --- |
 | `docker/px4/Dockerfile` | Builds the Ubuntu 24.04 SITL dependency image |
 | `docker/px4/build_image.sh` | Validates the PX4 tag and builds the image |
-| `src/px4_sitl_bringup/scripts/run_px4_sitl.sh` | Direct interactive startup command |
+| `src/px4_sitl_bringup/scripts/run_px4.sh` | Starts and supervises the complete PX4 session |
 | `src/px4_sitl_bringup/` | ROS package containing launch support |
-| `px4_sitl.launch.py` | Equivalent ROS 2 launch entry point |
+| `px4.launch.py` | Equivalent ROS 2 launch entry point |
 
 ## External-Drive Workspace
 
@@ -149,19 +153,33 @@ Expected image name:
 px4-sitl:v1.17.0
 ```
 
-## Start PX4 SITL and Gazebo
+## Start the PX4 Session
 
-The shell script is preferred for the first flight because it preserves the
-interactive PX4 console:
+Connect the external workspace first:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+./scripts/px4_workspace.sh connect
 ```
 
-Headless operation omits the Gazebo window:
+The single runtime launcher starts:
+
+```text
+Micro XRCE-DDS Agent
+QGroundControl
+PX4 SITL
+Gazebo X500
+```
+
+It preserves the interactive PX4 console:
 
 ```bash
-HEADLESS=1 ./src/px4_sitl_bringup/scripts/run_px4_sitl.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+Headless operation omits both graphical applications:
+
+```bash
+HEADLESS=1 ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
 ROS launch equivalent:
@@ -169,11 +187,22 @@ ROS launch equivalent:
 ```bash
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
-ros2 launch px4_sitl_bringup px4_sitl.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py
 ```
 
-These commands default to `/mnt/px4-workspace/PX4-Autopilot`. Override
-`PX4_SOURCE_DIR` only when using a different checkout location.
+Both commands use the same shell supervisor. Press `Ctrl+C` to stop every
+process that the launcher started. An already-running QGroundControl process
+is reused and is not stopped by the launcher.
+
+To inspect read-only PX4 telemetry from another terminal:
+
+```bash
+source /opt/ros/lyrical/setup.bash
+source /mnt/px4-workspace/px4_ros2_ws/install/setup.bash
+
+ros2 topic list -t | grep '^/fmu/out'
+ros2 topic echo /fmu/out/vehicle_status_v1 --once
+```
 
 The expected underlying PX4 build target is:
 
@@ -183,9 +212,11 @@ make px4_sitl gz_x500
 
 ## Networking and Display
 
-- Host networking exposes PX4's normal QGroundControl, MAVSDK, and uXRCE-DDS
-  UDP traffic directly on the host.
+- Host networking exposes PX4's normal QGroundControl and uXRCE-DDS UDP
+  traffic directly on the host.
+- The Agent listens on UDP port `8888` and publishes PX4 data into ROS 2 DDS.
 - The Gazebo GUI uses the host's X11/XWayland socket and display authorization.
+- QGroundControl runs directly on the Ubuntu host from its AppImage.
 - The runner requests Docker's NVIDIA runtime and all available NVIDIA GPUs.
 - NVIDIA graphics, display, utility, and compute driver capabilities are
   exposed to the container.
@@ -228,6 +259,17 @@ Commit or stash local work before switching branches.
 
 Containers started by the runner use `--rm`, so the container is deleted after
 it stops. Source and build output remain on the external drive.
+
+Press `Ctrl+C` in the launcher terminal for normal shutdown. The launcher stops
+its DDS Agent and PX4 containers and closes QGroundControl only when it started
+that QGroundControl process. The workspace helper remains the recovery path:
+
+```bash
+./scripts/px4_workspace.sh disconnect
+```
+
+It detects and stops both Docker containers before unmounting and powering off
+the external drive.
 
 To remove only the project dependency image:
 
