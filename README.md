@@ -30,6 +30,7 @@ QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
 | --- | --- |
 | `docker/px4/` | Builds the Ubuntu 24.04 PX4 dependency image |
 | `src/px4_sitl_bringup/` | ROS launch package and Docker runner |
+| `src/px4_offboard_control/` | Minimal ROS 2 Offboard example |
 | `PX4_SETUP.md` | Architecture, storage, startup, and cleanup guide |
 
 PX4 source and build output are intentionally stored outside this repository:
@@ -56,6 +57,9 @@ PX4 source and build output are intentionally stored outside this repository:
 See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
 small approval checkpoints so every installation and runtime step can be
 inspected and understood.
+
+See [docs/PX4_OFFBOARD_CONTROL.md](docs/PX4_OFFBOARD_CONTROL.md) for the
+Offboard message flow, build command, and simulation-only flight command.
 
 ## Run Commands
 
