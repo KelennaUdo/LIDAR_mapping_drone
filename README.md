@@ -61,6 +61,9 @@ inspected and understood.
 See [docs/PX4_OFFBOARD_CONTROL.md](docs/PX4_OFFBOARD_CONTROL.md) for the
 Offboard message flow, build command, and simulation-only flight command.
 
+See [docs/MAPPING_TEST_WORLD.md](docs/MAPPING_TEST_WORLD.md) for the compact
+Gazebo environment used to develop the future LiDAR and SLAM pipeline.
+
 ## Run Commands
 
 Connect the external workspace, then start the complete PX4 session:
@@ -81,7 +84,22 @@ ros2 launch px4_sitl_bringup px4.launch.py
 ```
 
 Both commands use the same shell supervisor and request the NVIDIA GPU for
-Gazebo. Press `Ctrl+C` in the launch terminal to stop the complete session.
+Gazebo. Press `Ctrl+C` in the launch terminal to stop PX4, Gazebo, the DDS
+Agent, and QGroundControl when it was started by that launcher. Closing only
+the Gazebo window does not stop the complete session.
+
+The project-owned mapping world is now selected automatically:
+
+```bash
+./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+The original empty PX4 world remains available with:
+
+```bash
+PX4_GZ_WORLD=default \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
+```
 
 ## Comparing With the X3 Sandbox
 

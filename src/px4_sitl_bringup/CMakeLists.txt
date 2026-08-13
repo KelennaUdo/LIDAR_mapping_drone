@@ -4,7 +4,7 @@ project(px4_sitl_bringup)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY launch scripts
+  DIRECTORY launch scripts worlds
   DESTINATION share/${PROJECT_NAME}
 )
 

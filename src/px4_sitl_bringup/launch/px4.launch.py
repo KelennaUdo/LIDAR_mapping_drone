@@ -58,7 +58,7 @@ def generate_launch_description():
                 default_value="px4-sitl:v1.17.0",
             ),
             DeclareLaunchArgument("model", default_value="gz_x500"),
-            DeclareLaunchArgument("world", default_value="default"),
+            DeclareLaunchArgument("world", default_value="mapping_test"),
             DeclareLaunchArgument("headless", default_value="0"),
             DeclareLaunchArgument("start_qgc", default_value="1"),
             DeclareLaunchArgument("dds_agent_port", default_value="8888"),

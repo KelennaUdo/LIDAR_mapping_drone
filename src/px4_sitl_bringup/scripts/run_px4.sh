@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+package_share="$(cd "$(dirname "$script_path")/.." && pwd)"
+
 PX4_VERSION="${PX4_VERSION:-v1.17.0}"
 PX4_IMAGE="${PX4_IMAGE:-px4-sitl:${PX4_VERSION}}"
 PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-/mnt/px4-workspace/PX4-Autopilot}"
 PX4_AGENT_DIR="${PX4_AGENT_DIR:-/mnt/px4-workspace/Micro-XRCE-DDS-Agent}"
+PX4_PROJECT_WORLDS_DIR="${PX4_PROJECT_WORLDS_DIR:-$package_share/worlds}"
 QGC_APPIMAGE="${QGC_APPIMAGE:-$HOME/Applications/QGroundControl/QGroundControl.AppImage}"
 PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_x500}"
-PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}"
+PX4_GZ_WORLD="${PX4_GZ_WORLD:-mapping_test}"
 HEADLESS="${HEADLESS:-0}"
 START_QGC="${START_QGC:-1}"
 DDS_AGENT_PORT="${DDS_AGENT_PORT:-8888}"
@@ -122,6 +126,7 @@ fi
 
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+trap 'exit 129' HUP
 
 agent_args=(
   run
@@ -191,8 +196,20 @@ px4_args=(
   --volume "$PX4_SOURCE_DIR:/workspace/PX4-Autopilot:rw"
 )
 
+# A project-owned world is overlaid at PX4's expected location without
+# modifying the external PX4 checkout. Built-in PX4 worlds need no overlay.
+project_world_file="$PX4_PROJECT_WORLDS_DIR/$PX4_GZ_WORLD.sdf"
+if [[ -f "$project_world_file" ]]; then
+  container_world_file="/workspace/PX4-Autopilot/Tools/simulation/gz/worlds/$PX4_GZ_WORLD.sdf"
+  px4_args+=(
+    --volume "$project_world_file:$container_world_file:ro"
+  )
+fi
+
+interactive_terminal="no"
 if [[ -t 0 && -t 1 ]]; then
-  px4_args+=(-it)
+  interactive_terminal="yes"
+  px4_args+=(--detach --interactive --tty)
 else
   px4_args+=(-i)
 fi
@@ -229,6 +246,11 @@ fi
 
 echo "Starting PX4 $PX4_VERSION with $PX4_SIM_MODEL in $PX4_GZ_WORLD"
 echo "Source and build output: $PX4_SOURCE_DIR"
+if [[ -f "$project_world_file" ]]; then
+  echo "World source: $project_world_file (project-owned, read-only)"
+else
+  echo "World source: PX4 built-in world"
+fi
 echo "Docker image: $PX4_IMAGE"
 echo "Graphics: NVIDIA GPU requested through the Docker NVIDIA runtime"
 echo "DDS Agent container: $DDS_AGENT_CONTAINER"
@@ -237,5 +259,18 @@ if [[ "$qgc_started" == "yes" ]]; then
 fi
 echo "Press Ctrl+C to stop the complete PX4 session."
 
-"${docker_command[@]}" "${px4_args[@]}" "$PX4_IMAGE" \
-  bash -lc 'make px4_sitl "$PX4_SIM_MODEL"'
+if [[ "$interactive_terminal" == "yes" ]]; then
+  # Start in the background, then attach with Ctrl+C reserved for returning
+  # control to this supervisor so cleanup() can stop the complete session.
+  "${docker_command[@]}" "${px4_args[@]}" "$PX4_IMAGE" \
+    bash -lc 'make px4_sitl "$PX4_SIM_MODEL"' \
+    >/dev/null
+
+  "${docker_command[@]}" attach \
+    --detach-keys=ctrl-c \
+    --sig-proxy=false \
+    "$PX4_CONTAINER"
+else
+  "${docker_command[@]}" "${px4_args[@]}" "$PX4_IMAGE" \
+    bash -lc 'make px4_sitl "$PX4_SIM_MODEL"'
+fi
