@@ -8,21 +8,33 @@ PX4_VERSION="${PX4_VERSION:-v1.17.0}"
 PX4_IMAGE="${PX4_IMAGE:-px4-sitl:${PX4_VERSION}}"
 PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-/mnt/px4-workspace/PX4-Autopilot}"
 PX4_AGENT_DIR="${PX4_AGENT_DIR:-/mnt/px4-workspace/Micro-XRCE-DDS-Agent}"
+PX4_PROJECT_MODELS_DIR="${PX4_PROJECT_MODELS_DIR:-$package_share/models}"
 PX4_PROJECT_WORLDS_DIR="${PX4_PROJECT_WORLDS_DIR:-$package_share/worlds}"
+LIDAR_BRIDGE_SCRIPT="${LIDAR_BRIDGE_SCRIPT:-$package_share/scripts/run_lidar_bridge.sh}"
+LIDAR_RVIZ_SCRIPT="${LIDAR_RVIZ_SCRIPT:-$package_share/scripts/run_lidar_rviz.sh}"
+X500_TF_SCRIPT="${X500_TF_SCRIPT:-$package_share/scripts/run_x500_tf.sh}"
 QGC_APPIMAGE="${QGC_APPIMAGE:-$HOME/Applications/QGroundControl/QGroundControl.AppImage}"
 PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_x500}"
 PX4_GZ_WORLD="${PX4_GZ_WORLD:-mapping_test}"
+GZ_PARTITION="${GZ_PARTITION:-px4_sitl}"
 HEADLESS="${HEADLESS:-0}"
 START_QGC="${START_QGC:-1}"
+START_RVIZ="${START_RVIZ:-1}"
+START_TF="${START_TF:-1}"
 DDS_AGENT_PORT="${DDS_AGENT_PORT:-8888}"
 DDS_AGENT_VERBOSE="${DDS_AGENT_VERBOSE:-4}"
 PX4_CONTAINER="${PX4_CONTAINER_NAME:-px4-sitl}"
 DDS_AGENT_CONTAINER="${DDS_AGENT_CONTAINER_NAME:-px4-dds-agent}"
 QGC_LOG="${QGC_LOG:-/tmp/px4-qgroundcontrol.log}"
+RVIZ_LOG="${RVIZ_LOG:-/tmp/px4-lidar-rviz.log}"
 
 docker_command=(docker)
 qgc_pid=""
 qgc_started="no"
+lidar_bridge_pid=""
+tf_bridge_pid=""
+rviz_pid=""
+rviz_started="no"
 cleanup_started="no"
 
 container_id() {
@@ -51,6 +63,28 @@ cleanup() {
 
   trap - EXIT INT TERM
   set +e
+
+  if [[ "$rviz_started" == "yes" && -n "$rviz_pid" ]] \
+    && kill -0 "$rviz_pid" 2>/dev/null; then
+    echo "Stopping RViz"
+    kill "$rviz_pid" 2>/dev/null
+    wait "$rviz_pid" 2>/dev/null
+  fi
+
+  if [[ -n "$tf_bridge_pid" ]] \
+    && kill -0 "$tf_bridge_pid" 2>/dev/null; then
+    echo "Stopping X500 TF adapter"
+    kill "$tf_bridge_pid" 2>/dev/null
+    wait "$tf_bridge_pid" 2>/dev/null
+  fi
+
+  if [[ -n "$lidar_bridge_pid" ]] \
+    && kill -0 "$lidar_bridge_pid" 2>/dev/null; then
+    echo "Stopping ROS 2 LiDAR bridge"
+    kill "$lidar_bridge_pid" 2>/dev/null
+    wait "$lidar_bridge_pid" 2>/dev/null
+  fi
+
   stop_container "$DDS_AGENT_CONTAINER" 10
   stop_container "$PX4_CONTAINER" 30
 
@@ -73,6 +107,21 @@ fi
 if [[ ! -x "$PX4_AGENT_DIR/build/MicroXRCEAgent" ]]; then
   echo "Micro XRCE-DDS Agent executable not found:" >&2
   echo "  $PX4_AGENT_DIR/build/MicroXRCEAgent" >&2
+  exit 2
+fi
+
+if [[ ! -x "$LIDAR_BRIDGE_SCRIPT" ]]; then
+  echo "LiDAR bridge runner is not executable: $LIDAR_BRIDGE_SCRIPT" >&2
+  exit 2
+fi
+
+if [[ ! -x "$LIDAR_RVIZ_SCRIPT" ]]; then
+  echo "LiDAR RViz runner is not executable: $LIDAR_RVIZ_SCRIPT" >&2
+  exit 2
+fi
+
+if [[ ! -x "$X500_TF_SCRIPT" ]]; then
+  echo "X500 TF runner is not executable: $X500_TF_SCRIPT" >&2
   exit 2
 fi
 
@@ -155,6 +204,32 @@ if [[ -z "$(container_id "$DDS_AGENT_CONTAINER")" ]]; then
   exit 2
 fi
 
+echo "Starting ROS 2 LiDAR point-cloud bridge"
+GZ_PARTITION="$GZ_PARTITION" "$LIDAR_BRIDGE_SCRIPT" &
+lidar_bridge_pid=$!
+
+sleep 1
+if ! kill -0 "$lidar_bridge_pid" 2>/dev/null; then
+  echo "ROS 2 LiDAR bridge stopped during startup." >&2
+  wait "$lidar_bridge_pid" 2>/dev/null || true
+  exit 2
+fi
+
+if [[ "$START_TF" == "1" || "$START_TF" == "true" ]]; then
+  echo "Starting X500 world-frame TF adapter"
+  GZ_PARTITION="$GZ_PARTITION" "$X500_TF_SCRIPT" &
+  tf_bridge_pid=$!
+
+  sleep 1
+  if ! kill -0 "$tf_bridge_pid" 2>/dev/null; then
+    echo "X500 TF adapter stopped during startup." >&2
+    wait "$tf_bridge_pid" 2>/dev/null || true
+    exit 2
+  fi
+else
+  echo "START_TF is disabled; world-frame RViz data may be unavailable."
+fi
+
 if [[ "$graphical" == "yes" \
   && ( "$START_QGC" == "1" || "$START_QGC" == "true" ) ]]; then
   if pgrep -u "$(id -u)" -f 'QGroundControl' >/dev/null 2>&1; then
@@ -177,6 +252,24 @@ else
   echo "START_QGC is disabled; QGroundControl will not be started."
 fi
 
+if [[ "$graphical" == "yes" \
+  && ( "$START_RVIZ" == "1" || "$START_RVIZ" == "true" ) ]]; then
+  echo "Starting RViz for the X500 3D LiDAR"
+  "$LIDAR_RVIZ_SCRIPT" >"$RVIZ_LOG" 2>&1 &
+  rviz_pid=$!
+  rviz_started="yes"
+  sleep 1
+  if ! kill -0 "$rviz_pid" 2>/dev/null; then
+    echo "RViz stopped during startup." >&2
+    echo "Log: $RVIZ_LOG" >&2
+    exit 2
+  fi
+elif [[ "$graphical" == "no" ]]; then
+  echo "HEADLESS mode: skipping RViz."
+else
+  echo "START_RVIZ is disabled; RViz will not be started."
+fi
+
 px4_args=(
   run
   --rm
@@ -193,8 +286,20 @@ px4_args=(
   --env __VK_LAYER_NV_optimus=NVIDIA_only
   --env "PX4_SIM_MODEL=$PX4_SIM_MODEL"
   --env "PX4_GZ_WORLD=$PX4_GZ_WORLD"
+  --env "GZ_PARTITION=$GZ_PARTITION"
   --volume "$PX4_SOURCE_DIR:/workspace/PX4-Autopilot:rw"
 )
+
+# Overlay a project-owned vehicle model at PX4's expected model path. This
+# changes only the container's view; the external PX4 checkout stays untouched.
+px4_model_name="${PX4_SIM_MODEL#gz_}"
+project_model_file="$PX4_PROJECT_MODELS_DIR/$px4_model_name/model.sdf"
+if [[ -f "$project_model_file" ]]; then
+  container_model_file="/workspace/PX4-Autopilot/Tools/simulation/gz/models/$px4_model_name/model.sdf"
+  px4_args+=(
+    --volume "$project_model_file:$container_model_file:ro"
+  )
+fi
 
 # A project-owned world is overlaid at PX4's expected location without
 # modifying the external PX4 checkout. Built-in PX4 worlds need no overlay.
@@ -246,6 +351,11 @@ fi
 
 echo "Starting PX4 $PX4_VERSION with $PX4_SIM_MODEL in $PX4_GZ_WORLD"
 echo "Source and build output: $PX4_SOURCE_DIR"
+if [[ -f "$project_model_file" ]]; then
+  echo "Model source: $project_model_file (project-owned, read-only)"
+else
+  echo "Model source: PX4 built-in model"
+fi
 if [[ -f "$project_world_file" ]]; then
   echo "World source: $project_world_file (project-owned, read-only)"
 else
@@ -253,9 +363,17 @@ else
 fi
 echo "Docker image: $PX4_IMAGE"
 echo "Graphics: NVIDIA GPU requested through the Docker NVIDIA runtime"
+echo "Gazebo Transport partition: $GZ_PARTITION"
 echo "DDS Agent container: $DDS_AGENT_CONTAINER"
+echo "ROS 2 point cloud: /x500/lidar/points"
+if [[ -n "$tf_bridge_pid" ]]; then
+  echo "ROS 2 TF chain: world -> base_link -> lidar_link"
+fi
 if [[ "$qgc_started" == "yes" ]]; then
   echo "QGroundControl log: $QGC_LOG"
+fi
+if [[ "$rviz_started" == "yes" ]]; then
+  echo "RViz log: $RVIZ_LOG"
 fi
 echo "Press Ctrl+C to stop the complete PX4 session."
 

@@ -59,8 +59,11 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("model", default_value="gz_x500"),
             DeclareLaunchArgument("world", default_value="mapping_test"),
+            DeclareLaunchArgument("gz_partition", default_value="px4_sitl"),
             DeclareLaunchArgument("headless", default_value="0"),
             DeclareLaunchArgument("start_qgc", default_value="1"),
+            DeclareLaunchArgument("start_rviz", default_value="1"),
+            DeclareLaunchArgument("start_tf", default_value="1"),
             DeclareLaunchArgument("dds_agent_port", default_value="8888"),
             DeclareLaunchArgument("dds_agent_verbose", default_value="4"),
             SetEnvironmentVariable(
@@ -81,9 +84,18 @@ def generate_launch_description():
             SetEnvironmentVariable(
                 "PX4_GZ_WORLD", LaunchConfiguration("world")
             ),
+            SetEnvironmentVariable(
+                "GZ_PARTITION", LaunchConfiguration("gz_partition")
+            ),
             SetEnvironmentVariable("HEADLESS", LaunchConfiguration("headless")),
             SetEnvironmentVariable(
                 "START_QGC", LaunchConfiguration("start_qgc")
+            ),
+            SetEnvironmentVariable(
+                "START_RVIZ", LaunchConfiguration("start_rviz")
+            ),
+            SetEnvironmentVariable(
+                "START_TF", LaunchConfiguration("start_tf")
             ),
             SetEnvironmentVariable(
                 "DDS_AGENT_PORT", LaunchConfiguration("dds_agent_port")

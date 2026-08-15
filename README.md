@@ -64,6 +64,9 @@ Offboard message flow, build command, and simulation-only flight command.
 See [docs/MAPPING_TEST_WORLD.md](docs/MAPPING_TEST_WORLD.md) for the compact
 Gazebo environment used to develop the future LiDAR and SLAM pipeline.
 
+See [docs/X500_3D_LIDAR.md](docs/X500_3D_LIDAR.md) for the project-owned
+Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
+
 ## Run Commands
 
 Connect the external workspace, then start the complete PX4 session:
@@ -73,8 +76,8 @@ Connect the external workspace, then start the complete PX4 session:
 ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
-The launcher starts the DDS Agent, QGroundControl, PX4 SITL, and Gazebo. The
-equivalent ROS 2 launch command is:
+The launcher starts the DDS Agent, LiDAR bridge, QGroundControl, RViz, PX4
+SITL, and Gazebo. The equivalent ROS 2 launch command is:
 
 ```bash
 source /opt/ros/lyrical/setup.bash

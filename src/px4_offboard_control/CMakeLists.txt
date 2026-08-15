@@ -15,8 +15,14 @@ target_link_libraries(
   PRIVATE rclcpp::rclcpp px4_msgs::px4_msgs
 )
 
+add_executable(offboard_teleop src/offboard_teleop.cpp)
+target_link_libraries(
+  offboard_teleop
+  PRIVATE rclcpp::rclcpp px4_msgs::px4_msgs
+)
+
 install(
-  TARGETS offboard_control
+  TARGETS offboard_control offboard_teleop
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -26,7 +32,9 @@ install(
 )
 
 install(
-  PROGRAMS scripts/run_offboard_control.sh
+  PROGRAMS
+    scripts/run_offboard_control.sh
+    scripts/run_offboard_teleop.sh
   DESTINATION share/${PROJECT_NAME}/scripts
 )
 
