@@ -92,7 +92,7 @@ private:
   float target_z_m_{-2.0F};
   float target_yaw_rad_{0.0F};
 
-  // Flight requests are separated so T never arms before heartbeat warm-up.
+  // Flight requests are separated so pressing 'T' never arms before heartbeat warm-up.
   bool takeoff_requested_{false};
   bool flight_enabled_{false};
   bool landing_requested_{false};
