@@ -60,6 +60,77 @@ stop_container() {
   fi
 }
 
+kiss_icp_process_ids() {
+  # Match both the `ros2 run` wrapper and its native KISS-ICP child process.
+  pgrep -u "$(id -u)" -f \
+    '(^|[/[:space:]])kiss_icp_node([[:space:]]|$)' || true
+}
+
+process_is_running() {
+  local process_state
+
+  process_state="$(ps -o stat= -p "$1" 2>/dev/null)" || return 1
+  process_state="${process_state//[[:space:]]/}"
+
+  [[ -n "$process_state" && "${process_state:0:1}" != "Z" ]]
+}
+
+wait_for_processes_to_stop() {
+  local timeout_seconds="$1"
+  shift
+
+  local checks=$((timeout_seconds * 10))
+  local check
+  local pid
+  local found_running_process
+
+  for ((check = 0; check < checks; ++check)); do
+    found_running_process="no"
+
+    for pid in "$@"; do
+      if process_is_running "$pid"; then
+        found_running_process="yes"
+        break
+      fi
+    done
+
+    if [[ "$found_running_process" == "no" ]]; then
+      return 0
+    fi
+
+    sleep 0.1
+  done
+
+  return 1
+}
+
+stop_kiss_icp() {
+  local -a process_ids=()
+  local pid
+
+  mapfile -t process_ids < <(kiss_icp_process_ids)
+  if [[ "${#process_ids[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  echo "Stopping KISS-ICP odometry"
+  kill -TERM "${process_ids[@]}" 2>/dev/null || true
+
+  if ! wait_for_processes_to_stop 5 "${process_ids[@]}"; then
+    echo "KISS-ICP did not stop after 5 seconds; forcing shutdown" >&2
+
+    for pid in "${process_ids[@]}"; do
+      if process_is_running "$pid"; then
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+    done
+  fi
+
+  if [[ -n "$kiss_icp_pid" ]]; then
+    wait "$kiss_icp_pid" 2>/dev/null || true
+  fi
+}
+
 start_kiss_icp() (
   # ROS setup files may read unset variables, so nounset is paused while sourcing.
   set +u
@@ -98,12 +169,7 @@ cleanup() {
     wait "$rviz_pid" 2>/dev/null
   fi
 
-  if [[ -n "$kiss_icp_pid" ]] \
-    && kill -0 "$kiss_icp_pid" 2>/dev/null; then
-    echo "Stopping KISS-ICP odometry"
-    kill "$kiss_icp_pid" 2>/dev/null
-    wait "$kiss_icp_pid" 2>/dev/null
-  fi
+  stop_kiss_icp
 
   if [[ -n "$tf_bridge_pid" ]] \
     && kill -0 "$tf_bridge_pid" 2>/dev/null; then
@@ -172,6 +238,21 @@ if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
     echo "Rebuild the external KISS-ICP workspace before launching." >&2
     exit 2
   fi
+fi
+
+mapfile -t stale_kiss_icp_pids < <(kiss_icp_process_ids)
+if [[ "${#stale_kiss_icp_pids[@]}" -gt 0 ]]; then
+  stale_kiss_icp_pid_list="$(
+    IFS=,
+    echo "${stale_kiss_icp_pids[*]}"
+  )"
+
+  echo "KISS-ICP is already running from an earlier session:" >&2
+  ps -o pid=,ppid=,stat=,args= -p "$stale_kiss_icp_pid_list" >&2
+  echo >&2
+  echo "Stop the stale session, then run this launcher again:" >&2
+  echo "  pkill -TERM -u $(id -u) -f 'kiss_icp_node'" >&2
+  exit 2
 fi
 
 if ! docker info >/dev/null 2>&1; then

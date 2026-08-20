@@ -127,6 +127,24 @@ START_KISS_ICP=0 \
 ros2 launch px4_sitl_bringup px4.launch.py enable_kiss_icp:=false
 ```
 
+Before starting any simulation processes, the launcher checks for a
+`kiss_icp_node` left by an earlier session. It refuses to start when one is
+found because that process still holds its previous map in memory and would
+mix new scans into the old trajectory. The error includes the stale process
+IDs and the command needed to stop them.
+
+During normal cleanup, the launcher stops both parts of the KISS process tree:
+
+```text
+ros2 run kiss_icp kiss_icp_node
+              |
+              v
+native kiss_icp_node process
+```
+
+This map exists in process memory. KISS-ICP does not automatically reload a
+previous local map from disk when a fresh node starts.
+
 ## Inspection
 
 ```bash
