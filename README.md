@@ -74,6 +74,9 @@ Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
 See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
 architecture, external build, runtime topics, and storage behavior.
 
+See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
+of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.
+
 ## Run Commands
 
 Connect the external workspace, then start the complete PX4 session:

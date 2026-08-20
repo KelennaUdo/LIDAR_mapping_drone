@@ -4,6 +4,9 @@ These notes are quick references for the tools used by the project. They are
 not scripts: run commands individually and read the comment above each command
 before using it.
 
+For a visual explanation of how the mapping pipeline grew, see the
+[Project Journey](PROJECT_JOURNEY.md).
+
 ## Start Here
 
 | Cheat sheet | Use it when |
