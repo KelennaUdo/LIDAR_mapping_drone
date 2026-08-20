@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>px4_sitl_bringup</name>
+  <version>0.0.1</version>
+  <description>Launch support for PX4 SITL, DDS, Gazebo, and QGroundControl.</description>
+  <maintainer email="kelenna@example.com">kelenna-udo</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>gz_msgs_vendor</depend>
+  <depend>gz_transport_vendor</depend>
+  <depend>rclcpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>kiss_icp</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

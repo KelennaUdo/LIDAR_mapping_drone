@@ -1,28 +1,136 @@
-# LIDAR_mapping_drone
+# PX4 SITL
 
-ROS 2 Lyrical and Gazebo simulation for an X3 quadcopter with a body-mounted planar LiDAR. The pipeline launches Gazebo, bridges the simulated scan and moving poses into ROS 2, and visualizes the scan in RViz.
+This branch is a focused learning environment for running PX4 SITL with the
+PX4-supported Gazebo X500 vehicle. PX4 and Gazebo run inside an Ubuntu 24.04
+Docker container while the computer continues to use Ubuntu 26.04.
 
-## Packages
+The custom X3 controller sandbox is preserved on the
+`feature/telemetry-sensors` branch. It is not part of this branch's runtime.
 
-- `lidar_mapping_drone_sim`: Gazebo model, world, and RViz assets.
-- `lidar_mapping_drone_bringup`: Runtime configuration and the combined launch file.
+## Architecture
 
-## Build
+```text
+ROS 2 telemetry                     Ubuntu 26.04 host
+        |
+        v
+Micro XRCE-DDS Agent                Ubuntu 24.04 Docker container
+        |
+        v
+PX4 SITL                            Ubuntu 24.04 Docker container
+        |
+        v
+Gazebo X500                         Ubuntu 24.04 Docker container
+
+QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
+
+Gazebo 3D LiDAR -> KISS-ICP         Ubuntu 26.04 host, LiDAR odometry
+```
+
+## Repository Contents
+
+| Path | Purpose |
+| --- | --- |
+| `docker/px4/` | Builds the Ubuntu 24.04 PX4 dependency image |
+| `src/px4_sitl_bringup/` | ROS launch package and Docker runner |
+| `src/px4_offboard_control/` | Minimal ROS 2 Offboard example |
+| `tools/odometry_comparison/` | KISS-ICP and PX4 trajectory evaluation |
+| `PX4_SETUP.md` | Architecture, storage, startup, and cleanup guide |
+
+PX4 source and build output are intentionally stored outside this repository:
+
+```text
+/mnt/px4-workspace/PX4-Autopilot
+```
+
+## Current Checkpoint
+
+- Docker Engine is installed and verified.
+- NVIDIA Container Toolkit `1.19.1` is installed and registered with Docker.
+- Docker containers can access the NVIDIA RTX 4050.
+- The Ubuntu 24.04 base image is available.
+- A 30 GB ext4 workspace filesystem exists on the external drive.
+- The workspace is mounted read-write at `/mnt/px4-workspace` and write-tested.
+- PX4 `v1.17.0` and all 39 recursive submodules are checked out.
+- Docker image `px4-sitl:v1.17.0` is built.
+- PX4 SITL and the Gazebo X500 launch and fly under QGroundControl.
+- Micro XRCE-DDS Agent `v2.4.3` is built.
+- `px4_msgs release/1.17` is built for ROS 2 Lyrical.
+- Read-only `/fmu/out/...` telemetry is verified in ROS 2.
+- KISS-ICP `v1.3.0` is built and verified against PX4 odometry.
+
+See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
+small approval checkpoints so every installation and runtime step can be
+inspected and understood.
+
+See [docs/PX4_OFFBOARD_CONTROL.md](docs/PX4_OFFBOARD_CONTROL.md) for the
+Offboard message flow, build command, and simulation-only flight command.
+
+See [docs/MAPPING_TEST_WORLD.md](docs/MAPPING_TEST_WORLD.md) for the compact
+Gazebo environment used to develop the future LiDAR and SLAM pipeline.
+
+See [docs/X500_3D_LIDAR.md](docs/X500_3D_LIDAR.md) for the project-owned
+Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
+
+See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
+architecture, external build, runtime topics, and storage behavior.
+
+See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
+of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.
+
+## Run Commands
+
+Connect the external workspace, then start the complete PX4 session:
+
+```bash
+./scripts/px4_workspace.sh connect
+./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+The launcher starts the DDS Agent, LiDAR bridge, KISS-ICP, QGroundControl,
+RViz, PX4 SITL, and Gazebo. The equivalent ROS 2 launch command is:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
-colcon build --symlink-install
 source install/setup.bash
+
+ros2 launch px4_sitl_bringup px4.launch.py
 ```
 
-## Run
+Both commands use the same shell supervisor and request the NVIDIA GPU for
+Gazebo. Press `Ctrl+C` in the launch terminal to stop PX4, Gazebo, the DDS
+Agent, KISS-ICP, and QGroundControl when they were started by that launcher.
+Closing only the Gazebo window does not stop the complete session.
+
+KISS-ICP is enabled by default. For a flight-only run:
 
 ```bash
-ros2 launch lidar_mapping_drone_bringup lidar_mapping_drone.launch.py
+START_KISS_ICP=0 \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
-Alternatively:
+The project-owned mapping world is now selected automatically:
 
 ```bash
-./src/run_lidar_mapping_drone.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+The original empty PX4 world remains available with:
+
+```bash
+PX4_GZ_WORLD=default \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+## Comparing With the X3 Sandbox
+
+Commit or stash work before changing branches, then use:
+
+```bash
+git switch feature/telemetry-sensors
+```
+
+Return to the PX4 branch with:
+
+```bash
+git switch feature/px4-sitl
 ```
