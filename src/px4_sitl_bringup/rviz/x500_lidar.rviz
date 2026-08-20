@@ -6,6 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /X500 3D LiDAR1
+        - /KISS-ICP Local Map1
+        - /KISS-ICP Odometry1
       Splitter Ratio: 0.55
     Tree Height: 720
   - Class: rviz_common/Views
@@ -65,6 +67,79 @@ Visualization Manager:
         Value: /x500/lidar/points
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Alpha: 0.85
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 160; 165; 170
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: KISS-ICP Local Map
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.015
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /kiss/local_map
+      Use Fixed Frame: true
+      Use rainbow: false
+      Value: true
+    - Angle Tolerance: 0.1
+      Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.3
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: false
+      Enabled: true
+      Keep: 300
+      Name: KISS-ICP Odometry
+      Position Tolerance: 0.05
+      Shape:
+        Alpha: 1
+        Axes Length: 0.6
+        Axes Radius: 0.06
+        Color: 255; 80; 20
+        Head Length: 0.2
+        Head Radius: 0.08
+        Shaft Length: 0.6
+        Shaft Radius: 0.04
+        Value: Axes
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /kiss/odometry
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true

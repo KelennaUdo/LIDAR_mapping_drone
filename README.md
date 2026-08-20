@@ -22,6 +22,8 @@ PX4 SITL                            Ubuntu 24.04 Docker container
 Gazebo X500                         Ubuntu 24.04 Docker container
 
 QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
+
+Gazebo 3D LiDAR -> KISS-ICP         Ubuntu 26.04 host, LiDAR odometry
 ```
 
 ## Repository Contents
@@ -31,6 +33,7 @@ QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
 | `docker/px4/` | Builds the Ubuntu 24.04 PX4 dependency image |
 | `src/px4_sitl_bringup/` | ROS launch package and Docker runner |
 | `src/px4_offboard_control/` | Minimal ROS 2 Offboard example |
+| `tools/odometry_comparison/` | KISS-ICP and PX4 trajectory evaluation |
 | `PX4_SETUP.md` | Architecture, storage, startup, and cleanup guide |
 
 PX4 source and build output are intentionally stored outside this repository:
@@ -53,6 +56,7 @@ PX4 source and build output are intentionally stored outside this repository:
 - Micro XRCE-DDS Agent `v2.4.3` is built.
 - `px4_msgs release/1.17` is built for ROS 2 Lyrical.
 - Read-only `/fmu/out/...` telemetry is verified in ROS 2.
+- KISS-ICP `v1.3.0` is built and verified against PX4 odometry.
 
 See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
 small approval checkpoints so every installation and runtime step can be
@@ -67,6 +71,9 @@ Gazebo environment used to develop the future LiDAR and SLAM pipeline.
 See [docs/X500_3D_LIDAR.md](docs/X500_3D_LIDAR.md) for the project-owned
 Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
 
+See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
+architecture, external build, runtime topics, and storage behavior.
+
 ## Run Commands
 
 Connect the external workspace, then start the complete PX4 session:
@@ -76,8 +83,8 @@ Connect the external workspace, then start the complete PX4 session:
 ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
 
-The launcher starts the DDS Agent, LiDAR bridge, QGroundControl, RViz, PX4
-SITL, and Gazebo. The equivalent ROS 2 launch command is:
+The launcher starts the DDS Agent, LiDAR bridge, KISS-ICP, QGroundControl,
+RViz, PX4 SITL, and Gazebo. The equivalent ROS 2 launch command is:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
@@ -88,8 +95,15 @@ ros2 launch px4_sitl_bringup px4.launch.py
 
 Both commands use the same shell supervisor and request the NVIDIA GPU for
 Gazebo. Press `Ctrl+C` in the launch terminal to stop PX4, Gazebo, the DDS
-Agent, and QGroundControl when it was started by that launcher. Closing only
-the Gazebo window does not stop the complete session.
+Agent, KISS-ICP, and QGroundControl when they were started by that launcher.
+Closing only the Gazebo window does not stop the complete session.
+
+KISS-ICP is enabled by default. For a flight-only run:
+
+```bash
+START_KISS_ICP=0 \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
+```
 
 The project-owned mapping world is now selected automatically:
 

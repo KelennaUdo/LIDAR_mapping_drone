@@ -8,6 +8,10 @@ PX4_VERSION="${PX4_VERSION:-v1.17.0}"
 PX4_IMAGE="${PX4_IMAGE:-px4-sitl:${PX4_VERSION}}"
 PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-/mnt/px4-workspace/PX4-Autopilot}"
 PX4_AGENT_DIR="${PX4_AGENT_DIR:-/mnt/px4-workspace/Micro-XRCE-DDS-Agent}"
+KISS_ICP_INSTALL_DIR="${KISS_ICP_INSTALL_DIR:-/mnt/px4-workspace/kiss_icp_ws/install}"
+KISS_ICP_SETUP="${KISS_ICP_SETUP:-$KISS_ICP_INSTALL_DIR/setup.bash}"
+KISS_ICP_CONFIG="${KISS_ICP_CONFIG:-$KISS_ICP_INSTALL_DIR/kiss_icp/share/kiss_icp/config/config.yaml}"
+KISS_ICP_POINTCLOUD_TOPIC="${KISS_ICP_POINTCLOUD_TOPIC:-/x500/lidar/points}"
 PX4_PROJECT_MODELS_DIR="${PX4_PROJECT_MODELS_DIR:-$package_share/models}"
 PX4_PROJECT_WORLDS_DIR="${PX4_PROJECT_WORLDS_DIR:-$package_share/worlds}"
 LIDAR_BRIDGE_SCRIPT="${LIDAR_BRIDGE_SCRIPT:-$package_share/scripts/run_lidar_bridge.sh}"
@@ -21,18 +25,21 @@ HEADLESS="${HEADLESS:-0}"
 START_QGC="${START_QGC:-1}"
 START_RVIZ="${START_RVIZ:-1}"
 START_TF="${START_TF:-1}"
+START_KISS_ICP="${START_KISS_ICP:-1}"
 DDS_AGENT_PORT="${DDS_AGENT_PORT:-8888}"
 DDS_AGENT_VERBOSE="${DDS_AGENT_VERBOSE:-4}"
 PX4_CONTAINER="${PX4_CONTAINER_NAME:-px4-sitl}"
 DDS_AGENT_CONTAINER="${DDS_AGENT_CONTAINER_NAME:-px4-dds-agent}"
 QGC_LOG="${QGC_LOG:-/tmp/px4-qgroundcontrol.log}"
 RVIZ_LOG="${RVIZ_LOG:-/tmp/px4-lidar-rviz.log}"
+KISS_ICP_LOG="${KISS_ICP_LOG:-/tmp/px4-kiss-icp.log}"
 
 docker_command=(docker)
 qgc_pid=""
 qgc_started="no"
 lidar_bridge_pid=""
 tf_bridge_pid=""
+kiss_icp_pid=""
 rviz_pid=""
 rviz_started="no"
 cleanup_started="no"
@@ -53,6 +60,26 @@ stop_container() {
   fi
 }
 
+start_kiss_icp() (
+  # ROS setup files may read unset variables, so nounset is paused while sourcing.
+  set +u
+  source /opt/ros/lyrical/setup.bash
+  source "$KISS_ICP_SETUP"
+  set -u
+
+  exec ros2 run kiss_icp kiss_icp_node --ros-args \
+    --remap "pointcloud_topic:=$KISS_ICP_POINTCLOUD_TOPIC" \
+    --params-file "$KISS_ICP_CONFIG" \
+    -p base_frame:=lidar_link \
+    -p lidar_odom_frame:=odom_lidar \
+    -p publish_odom_tf:=true \
+    -p invert_odom_tf:=true \
+    -p publish_debug_clouds:=true \
+    -p use_sim_time:=true \
+    -p position_covariance:=0.1 \
+    -p orientation_covariance:=0.1
+)
+
 cleanup() {
   local exit_code=$?
 
@@ -69,6 +96,13 @@ cleanup() {
     echo "Stopping RViz"
     kill "$rviz_pid" 2>/dev/null
     wait "$rviz_pid" 2>/dev/null
+  fi
+
+  if [[ -n "$kiss_icp_pid" ]] \
+    && kill -0 "$kiss_icp_pid" 2>/dev/null; then
+    echo "Stopping KISS-ICP odometry"
+    kill "$kiss_icp_pid" 2>/dev/null
+    wait "$kiss_icp_pid" 2>/dev/null
   fi
 
   if [[ -n "$tf_bridge_pid" ]] \
@@ -123,6 +157,21 @@ fi
 if [[ ! -x "$X500_TF_SCRIPT" ]]; then
   echo "X500 TF runner is not executable: $X500_TF_SCRIPT" >&2
   exit 2
+fi
+
+if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
+  if [[ ! -f "$KISS_ICP_SETUP" ]]; then
+    echo "KISS-ICP workspace setup not found: $KISS_ICP_SETUP" >&2
+    echo "Connect the PX4 workspace and build KISS-ICP first." >&2
+    echo "Set START_KISS_ICP=0 to launch without LiDAR odometry." >&2
+    exit 2
+  fi
+
+  if [[ ! -f "$KISS_ICP_CONFIG" ]]; then
+    echo "KISS-ICP configuration not found: $KISS_ICP_CONFIG" >&2
+    echo "Rebuild the external KISS-ICP workspace before launching." >&2
+    exit 2
+  fi
 fi
 
 if ! docker info >/dev/null 2>&1; then
@@ -228,6 +277,23 @@ if [[ "$START_TF" == "1" || "$START_TF" == "true" ]]; then
   fi
 else
   echo "START_TF is disabled; world-frame RViz data may be unavailable."
+fi
+
+if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
+  echo "Starting KISS-ICP LiDAR odometry"
+  start_kiss_icp >"$KISS_ICP_LOG" 2>&1 &
+  kiss_icp_pid=$!
+
+  sleep 1
+  if ! kill -0 "$kiss_icp_pid" 2>/dev/null; then
+    echo "KISS-ICP stopped during startup." >&2
+    echo "Log: $KISS_ICP_LOG" >&2
+    tail -n 40 "$KISS_ICP_LOG" >&2 || true
+    wait "$kiss_icp_pid" 2>/dev/null || true
+    exit 2
+  fi
+else
+  echo "START_KISS_ICP is disabled; LiDAR odometry will not be started."
 fi
 
 if [[ "$graphical" == "yes" \
@@ -366,6 +432,11 @@ echo "Graphics: NVIDIA GPU requested through the Docker NVIDIA runtime"
 echo "Gazebo Transport partition: $GZ_PARTITION"
 echo "DDS Agent container: $DDS_AGENT_CONTAINER"
 echo "ROS 2 point cloud: /x500/lidar/points"
+if [[ -n "$kiss_icp_pid" ]]; then
+  echo "KISS-ICP odometry: /kiss/odometry"
+  echo "KISS-ICP local map: /kiss/local_map"
+  echo "KISS-ICP log: $KISS_ICP_LOG"
+fi
 if [[ -n "$tf_bridge_pid" ]]; then
   echo "ROS 2 TF chain: world -> base_link -> lidar_link"
 fi

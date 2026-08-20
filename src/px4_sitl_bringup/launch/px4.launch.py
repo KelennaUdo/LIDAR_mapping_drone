@@ -39,6 +39,16 @@ def generate_launch_description():
                 description="Built Micro XRCE-DDS Agent checkout",
             ),
             DeclareLaunchArgument(
+                "kiss_icp_install_dir",
+                default_value=EnvironmentVariable(
+                    "KISS_ICP_INSTALL_DIR",
+                    default_value=(
+                        "/mnt/px4-workspace/kiss_icp_ws/install"
+                    ),
+                ),
+                description="Built KISS-ICP ROS 2 install space",
+            ),
+            DeclareLaunchArgument(
                 "qgc_appimage",
                 default_value=EnvironmentVariable(
                     "QGC_APPIMAGE",
@@ -64,6 +74,7 @@ def generate_launch_description():
             DeclareLaunchArgument("start_qgc", default_value="1"),
             DeclareLaunchArgument("start_rviz", default_value="1"),
             DeclareLaunchArgument("start_tf", default_value="1"),
+            DeclareLaunchArgument("enable_kiss_icp", default_value="1"),
             DeclareLaunchArgument("dds_agent_port", default_value="8888"),
             DeclareLaunchArgument("dds_agent_verbose", default_value="4"),
             SetEnvironmentVariable(
@@ -74,6 +85,10 @@ def generate_launch_description():
             ),
             SetEnvironmentVariable(
                 "QGC_APPIMAGE", LaunchConfiguration("qgc_appimage")
+            ),
+            SetEnvironmentVariable(
+                "KISS_ICP_INSTALL_DIR",
+                LaunchConfiguration("kiss_icp_install_dir"),
             ),
             SetEnvironmentVariable(
                 "PX4_IMAGE", LaunchConfiguration("px4_image")
@@ -96,6 +111,10 @@ def generate_launch_description():
             ),
             SetEnvironmentVariable(
                 "START_TF", LaunchConfiguration("start_tf")
+            ),
+            SetEnvironmentVariable(
+                "START_KISS_ICP",
+                LaunchConfiguration("enable_kiss_icp"),
             ),
             SetEnvironmentVariable(
                 "DDS_AGENT_PORT", LaunchConfiguration("dds_agent_port")
