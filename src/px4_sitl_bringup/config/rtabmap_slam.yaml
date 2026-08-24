@@ -1,0 +1,24 @@
+rtabmap:
+  ros__parameters:
+    # Use timestamps from rosbag playback instead of the computer's wall clock.
+    use_sim_time: true
+
+    # RTAB-Map estimates the LiDAR pose and publishes map -> odom_lidar.
+    frame_id: lidar_link
+    map_frame_id: map
+    publish_tf: true
+
+    # This project supplies external KISS-ICP odometry and a 3D point cloud.
+    subscribe_odom: true
+    subscribe_scan_cloud: true
+    subscribe_rgb: false
+    subscribe_depth: false
+    subscribe_stereo: false
+
+    # Use geometric ICP registration because this pipeline has LiDAR, not images.
+    "Reg/Strategy": "1"
+    "Grid/FromDepth": "false"
+    "Grid/Sensor": "0"
+
+    # Search nearby trajectory nodes for LiDAR-only loop-closure constraints.
+    "RGBD/ProximityPathMaxNeighbors": "1"

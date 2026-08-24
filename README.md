@@ -24,6 +24,9 @@ Gazebo X500                         Ubuntu 24.04 Docker container
 QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
 
 Gazebo 3D LiDAR -> KISS-ICP         Ubuntu 26.04 host, LiDAR odometry
+                         |
+                         v
+                     RTAB-Map       Ubuntu 26.04 host, graph-based SLAM
 ```
 
 ## Repository Contents
@@ -57,6 +60,9 @@ PX4 source and build output are intentionally stored outside this repository:
 - `px4_msgs release/1.17` is built for ROS 2 Lyrical.
 - Read-only `/fmu/out/...` telemetry is verified in ROS 2.
 - KISS-ICP `v1.3.0` is built and verified against PX4 odometry.
+- Offline RTAB-Map LiDAR SLAM is running with synchronized bag timestamps.
+- The first RTAB-Map database reconstructs the arena and contains one local
+  geometric closure; a deliberate long-loop test is the next checkpoint.
 
 See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
 small approval checkpoints so every installation and runtime step can be
@@ -73,6 +79,9 @@ Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
 
 See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
 architecture, external build, runtime topics, and storage behavior.
+
+See [docs/RTABMAP_SLAM.md](docs/RTABMAP_SLAM.md) for the offline graph-SLAM
+pipeline, clock adapter, database workflow, and first loop-closure result.
 
 See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
 of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.

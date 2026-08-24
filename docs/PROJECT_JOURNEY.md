@@ -20,6 +20,9 @@ KISS-ICP odometry and local map
         |
         v
 Comparison against PX4 odometry
+        |
+        v
+RTAB-Map graph and persistent 3D map
 ```
 
 The earlier X3 custom-controller work remains an important learning sandbox
@@ -153,6 +156,50 @@ this first tool compares position but not orientation or velocity.
 The reusable comparison scripts are documented under
 [`tools/odometry_comparison/`](../tools/odometry_comparison/README.md).
 
+## 6. RTAB-Map Graph SLAM
+
+![RTAB-Map assembled LiDAR map](images/project_journey/07_rtabmap_assembled_map.png)
+
+KISS-ICP estimates the LiDAR's motion. RTAB-Map uses that odometry together
+with the same 3D scans to create a graph of places and motion constraints. It
+also stores the observations and graph in a database that can be inspected
+after all ROS processes have stopped.
+
+```text
+recorded PointCloud2
+        |
+        +----> synchronized /clock
+        |
+        v
+    KISS-ICP ----> /kiss/odometry
+        |                  |
+        +--------+---------+
+                 v
+              RTAB-Map
+                 |
+                 +----> map -> odom_lidar TF
+                 +----> persistent .db file
+```
+
+The first saved database, `x500_test_02.db`, is about 13 MB. Its assembled
+point cloud clearly shows the arena walls and interior geometry.
+
+The graph contains 60 connected nodes, 59 sequential constraints, and one
+local-space closure between nodes 134 and 149. Those observations are only
+15 seconds apart, so this is a nearby geometric revisit rather than a strong
+return-to-start loop closure.
+
+**This proves:** the offline timestamp pipeline is consistent, RTAB-Map can
+consume KISS-ICP odometry and LiDAR scans, the database persists, and nearby
+geometry can create a closure constraint.
+
+**This does not prove:** robust long-loop closure or meaningful global drift
+correction. The next bag must deliberately return to the same place and yaw
+after a longer flight.
+
+See [RTABMAP_SLAM.md](RTABMAP_SLAM.md) for the launch sequence, clock-adapter
+explanation, database viewer workflow, and measured graph results.
+
 ## Current Mental Model
 
 The system now has two largely independent ways to describe the same flight:
@@ -165,8 +212,12 @@ Gazebo physics and PX4 sensors          Gazebo 3D LiDAR
               |                              |
               v                              v
 /fmu/out/vehicle_odometry              /kiss/odometry
-              \                              /
-               +------ comparison tool -----+
+              \                              /      |
+               +------ comparison tool -----+       v
+                                                   RTAB-Map
+                                                      |
+                                                      v
+                                             graph + persistent map
 ```
 
 That independence is useful. Agreement increases confidence in the pipeline;
