@@ -38,8 +38,10 @@ correct drift accumulated while travelling around the loop.
 | --- | --- |
 | `config/rtabmap_slam.yaml` | LiDAR-only RTAB-Map parameters |
 | `launch/rtabmap_slam.launch.py` | Starts KISS-ICP, RTAB-Map, and RViz |
+| `launch/record_slam_loop.launch.py` | Records the six topics that define one SLAM experiment |
 | `rviz/x500_slam.rviz` | Displays the map cloud, graph, odometry, and TF |
 | `scripts/run_rtabmap_slam.sh` | Checks paths, sources workspaces, and starts the launch file |
+| `scripts/run_slam_loop_recording.sh` | Checks the live pipeline and starts the recorder |
 
 All paths above are inside `src/px4_sitl_bringup/`.
 
@@ -82,6 +84,54 @@ Successful output ends with:
 ```text
 Summary: 1 package finished
 ```
+
+## Record a Controlled Loop
+
+This experiment uses three terminals. Their roles are intentionally separate:
+
+```text
+terminal 1: create the simulated sensor and flight data
+terminal 2: preserve that data in one rosbag
+terminal 3: send your keyboard flight commands
+```
+
+First connect the external workspace:
+
+```bash
+./scripts/px4_workspace.sh connect
+```
+
+In terminal 1, start PX4 without live KISS-ICP. Odometry will be reconstructed
+from the bag during the offline SLAM run:
+
+```bash
+START_KISS_ICP=0 \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh
+```
+
+After PX4, Gazebo, and the LiDAR bridge are running, start the recorder in
+terminal 2:
+
+```bash
+./src/px4_sitl_bringup/scripts/run_slam_loop_recording.sh
+```
+
+The recorder waits for `/clock`, LiDAR, PX4 odometry and status, and both TF
+topics. It then prints the new timestamped bag path under:
+
+```text
+/mnt/px4-workspace/bags/x500_slam_loop_<timestamp>
+```
+
+In terminal 3, start keyboard control:
+
+```bash
+./src/px4_offboard_control/scripts/run_offboard_teleop.sh
+```
+
+Fly slowly around the arena, return close to the starting position and yaw,
+and hover there briefly. Land first, then press `Ctrl+C` in terminal 2 so
+rosbag can finish its metadata cleanly.
 
 ## Run an Offline Mapping Test
 
