@@ -6,3 +6,12 @@
   direction: GZ_TO_ROS
   qos_profile: SENSOR_DATA
   lazy: false
+
+# Share Gazebo simulation time with ROS 2 nodes and future rosbag recordings.
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+  qos_profile: CLOCK
+  lazy: false

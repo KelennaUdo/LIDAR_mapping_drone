@@ -45,13 +45,12 @@ set -u
 
 echo "Starting offline X500 LiDAR SLAM"
 echo "Point cloud:  /x500/lidar/points"
-echo "Bag input:    /x500/lidar/points_recorded"
+echo "Clock:        /clock from the recorded Gazebo session"
 echo "Odometry:     /kiss/odometry"
 echo "Map database: $database_path"
-echo "Replay the LiDAR topic without --clock in another terminal:"
+echo "Replay the recorded clock and LiDAR topics in another terminal:"
 printf '%s\n' \
-  "  ros2 bag play <bag> --topics /x500/lidar/points \\" \
-  "    --remap /x500/lidar/points:=/x500/lidar/points_recorded"
+  "  ros2 bag play <bag> --topics /clock /x500/lidar/points"
 
 exec ros2 launch px4_sitl_bringup rtabmap_slam.launch.py \
   "database_path:=$database_path" \

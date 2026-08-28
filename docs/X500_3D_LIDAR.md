@@ -146,7 +146,8 @@ ros2 run tf2_ros tf2_echo base_link lidar_link
 To launch RViz by itself while the simulation and bridge are already running:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_lidar_rviz.sh
+source /opt/ros/lyrical/setup.bash
+rviz2 -d src/px4_sitl_bringup/rviz/x500_lidar.rviz
 ```
 
 To run the complete simulation without automatically opening RViz:

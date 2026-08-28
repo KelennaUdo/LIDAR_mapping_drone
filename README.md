@@ -81,7 +81,8 @@ See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
 architecture, external build, runtime topics, and storage behavior.
 
 See [docs/RTABMAP_SLAM.md](docs/RTABMAP_SLAM.md) for the offline graph-SLAM
-pipeline, clock adapter, database workflow, and first loop-closure result.
+pipeline, clock-synchronized replay, database workflow, and first
+loop-closure result.
 
 See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
 of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.

@@ -37,31 +37,36 @@ correct drift accumulated while travelling around the loop.
 | File | Purpose |
 | --- | --- |
 | `config/rtabmap_slam.yaml` | LiDAR-only RTAB-Map parameters |
-| `launch/rtabmap_slam.launch.py` | Starts the clock adapter, KISS-ICP, RTAB-Map, and RViz |
+| `launch/rtabmap_slam.launch.py` | Starts KISS-ICP, RTAB-Map, and RViz |
 | `rviz/x500_slam.rviz` | Displays the map cloud, graph, odometry, and TF |
 | `scripts/run_rtabmap_slam.sh` | Checks paths, sources workspaces, and starts the launch file |
-| `src/pointcloud_clock_adapter.cpp` | Reconstructs simulation time from old point-cloud stamps |
 
 All paths above are inside `src/px4_sitl_bringup/`.
 
-## Why the Clock Adapter Exists
+## Clock Requirement
 
-The first X500 mapping bag contains Gazebo timestamps in the point-cloud
-headers, but it does not contain a `/clock` topic. Normal rosbag playback uses
-the bag's much larger wall-clock timestamps for its generated clock. TF then
-sees the cloud and transforms as if they came from different timelines and
-reports `TF_OLD_DATA` or extrapolation errors.
+KISS-ICP, RTAB-Map, TF, and RViz must agree about simulation time. The live
+Gazebo-to-ROS bridge therefore publishes Gazebo's clock as ROS 2 `/clock`, and
+each new mapping bag must record that topic with the LiDAR cloud.
 
-The adapter keeps every point cloud unchanged while doing this in order:
+The recording and replay timeline is:
 
-1. receive `/x500/lidar/points_recorded`;
-2. publish its header timestamp on `/clock`;
-3. republish the cloud as `/x500/lidar/points`.
+```text
+Gazebo /clock + Gazebo LiDAR
+              |
+              v
+       ROS 2 clock + PointCloud2
+              |
+              v
+       clock-complete rosbag
+              |
+              v
+    KISS-ICP + RTAB-Map + RViz
+```
 
-KISS-ICP, RTAB-Map, and RViz all use simulation time, so the complete offline
-pipeline now agrees about what time it is. This adapter is a compatibility
-tool for recordings without `/clock`; future bags should record `/clock`
-directly.
+Recordings without `/clock` are no longer supported. Keeping one clock-native
+workflow avoids hidden timestamp repair logic and makes future experiments
+easier to reproduce.
 
 ## Build
 
@@ -86,24 +91,23 @@ Connect the external workspace first:
 ./scripts/px4_workspace.sh connect
 ```
 
-Start the SLAM pipeline in terminal 1. Choose a new database name when the
-recording is a new experiment:
+Start the SLAM pipeline in terminal 1. Choose a new database name for each
+experiment:
 
 ```bash
-RTABMAP_DATABASE_PATH=/mnt/px4-workspace/rtabmap_maps/x500_test_02.db \
+RTABMAP_DATABASE_PATH=/mnt/px4-workspace/rtabmap_maps/x500_long_loop_01.db \
   ./src/px4_sitl_bringup/scripts/run_rtabmap_slam.sh
 ```
 
-In terminal 2, replay only the recorded cloud and remap it to the adapter's
-input. Do not pass `--clock` for this older bag:
+In terminal 2, replay the recorded Gazebo clock and LiDAR cloud. Replace the
+placeholder with the path to a clock-complete mapping bag:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
 
 ros2 bag play \
-  bags/x500_mapping_loop_20260818_152906 \
-  --topics /x500/lidar/points \
-  --remap /x500/lidar/points:=/x500/lidar/points_recorded
+  /mnt/px4-workspace/bags/<clock-complete-bag> \
+  --topics /clock /x500/lidar/points
 ```
 
 After playback finishes, press `Ctrl+C` in terminal 1. RTAB-Map saves the
@@ -133,8 +137,10 @@ contains only one graph node.
 
 ## Verified First Result
 
-The `x500_test_02.db` run produced a recognizable 3D reconstruction of the
-mapping arena and saved a database of about 13 MB.
+Before the old non-clock bag was removed, the `x500_test_02.db` run produced a
+recognizable 3D reconstruction of the mapping arena and saved a database of
+about 13 MB. The database and documentation image preserve that result even
+though the raw bag is no longer kept in the repository.
 
 | Measurement | Result |
 | --- | ---: |
@@ -144,7 +150,7 @@ mapping arena and saved a database of about 13 MB.
 | Local-space closure constraints | 1 |
 | Global loop closures | 0 |
 | Connected graph components | 1 |
-| Timing errors after adapter fix | 0 |
+| Timing errors during synchronized replay | 0 |
 
 The one local-space closure connects nodes 134 and 149, whose scan timestamps
 are 296 s and 311 s. This is useful evidence that geometric proximity matching
@@ -153,7 +159,7 @@ a deliberate return-to-start loop closure.
 
 ## Current Limitations
 
-- This first bag did not record `/clock`, so offline replay needs the adapter.
+- The original raw bag was removed during project cleanup.
 - The flight was not designed specifically to test a long loop closure.
 - LiDAR-only operation does not use camera appearance for place recognition.
 - Most graph structure still follows KISS-ICP odometry and sequential links.

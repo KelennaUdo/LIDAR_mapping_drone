@@ -12,16 +12,10 @@ find_package(gz_transport_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz-transport REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rosgraph_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 add_executable(x500_tf_bridge src/x500_tf_bridge.cpp)
-add_executable(
-  pointcloud_clock_adapter
-  src/pointcloud_clock_adapter.cpp
-)
 
 target_link_libraries(
   x500_tf_bridge
@@ -34,18 +28,8 @@ target_link_libraries(
     tf2_ros::tf2_ros
 )
 
-target_link_libraries(
-  pointcloud_clock_adapter
-  PRIVATE
-    rclcpp::rclcpp
-    rosgraph_msgs::rosgraph_msgs
-    sensor_msgs::sensor_msgs
-)
-
 install(
-  TARGETS
-    pointcloud_clock_adapter
-    x500_tf_bridge
+  TARGETS x500_tf_bridge
   DESTINATION lib/${PROJECT_NAME}
 )
 

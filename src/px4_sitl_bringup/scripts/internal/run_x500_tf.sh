@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Find the workspace so ros2 can locate this package's compiled TF adapter.
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-workspace_root="${LIDAR_WORKSPACE:-$(cd "$(dirname "$script_path")/../../.." && pwd)}"
+workspace_root="${LIDAR_WORKSPACE:-$(cd "$(dirname "$script_path")/../../../.." && pwd)}"
 GZ_PARTITION="${GZ_PARTITION:-px4_sitl}"
 export GZ_PARTITION
 

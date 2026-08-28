@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Locate the project-owned RViz configuration in source or install space.
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-package_share="$(cd "$(dirname "$script_path")/.." && pwd)"
+package_share="$(cd "$(dirname "$script_path")/../.." && pwd)"
 rviz_config="${LIDAR_RVIZ_CONFIG:-$package_share/rviz/x500_lidar.rviz}"
 
 if [[ ! -f "$rviz_config" ]]; then

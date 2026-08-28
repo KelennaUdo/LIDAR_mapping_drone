@@ -197,8 +197,8 @@ geometry can create a closure constraint.
 correction. The next bag must deliberately return to the same place and yaw
 after a longer flight.
 
-See [RTABMAP_SLAM.md](RTABMAP_SLAM.md) for the launch sequence, clock-adapter
-explanation, database viewer workflow, and measured graph results.
+See [RTABMAP_SLAM.md](RTABMAP_SLAM.md) for the launch sequence, clock
+requirement, database viewer workflow, and measured graph results.
 
 ## Current Mental Model
 

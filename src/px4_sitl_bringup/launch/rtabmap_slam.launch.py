@@ -26,9 +26,6 @@ def generate_launch_description():
     )
 
     pointcloud_topic = LaunchConfiguration("pointcloud_topic")
-    recorded_pointcloud_topic = LaunchConfiguration(
-        "recorded_pointcloud_topic"
-    )
     odometry_topic = LaunchConfiguration("odometry_topic")
 
     return LaunchDescription(
@@ -56,24 +53,10 @@ def generate_launch_description():
                 default_value="/x500/lidar/points",
             ),
             DeclareLaunchArgument(
-                "recorded_pointcloud_topic",
-                default_value="/x500/lidar/points_recorded",
-            ),
-            DeclareLaunchArgument(
                 "odometry_topic",
                 default_value="/kiss/odometry",
             ),
             DeclareLaunchArgument("start_rviz", default_value="1"),
-            Node(
-                package="px4_sitl_bringup",
-                executable="pointcloud_clock_adapter",
-                name="pointcloud_clock_adapter",
-                output="screen",
-                remappings=[
-                    ("recorded_pointcloud", recorded_pointcloud_topic),
-                    ("pointcloud", pointcloud_topic),
-                ],
-            ),
             Node(
                 package="kiss_icp",
                 executable="kiss_icp_node",
