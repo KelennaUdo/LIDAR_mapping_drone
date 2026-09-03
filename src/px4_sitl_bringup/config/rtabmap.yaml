@@ -20,5 +20,14 @@
     "Grid/FromDepth": "false"
     "Grid/Sensor": "0"
 
+    # Build a planner-ready 3D occupancy map. Ray tracing distinguishes space
+    # observed as free from space that the LiDAR has not observed yet.
+    "Grid/3D": "true"
+    "Grid/CellSize": "0.10"
+    "Grid/GroundIsObstacle": "true"
+    "Grid/RayTracing": "true"
+    "Grid/RangeMin": "0.3"
+    "Grid/RangeMax": "20.0"
+
     # Search nearby trajectory nodes for LiDAR-only loop-closure constraints.
     "RGBD/ProximityPathMaxNeighbors": "1"
