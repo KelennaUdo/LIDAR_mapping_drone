@@ -67,14 +67,28 @@ def generate_launch_description():
                 "px4_image",
                 default_value="px4-sitl:v1.17.0",
             ),
+            DeclareLaunchArgument(
+                "mode",
+                default_value="odometry",
+                description="Bringup mode: simulation, odometry, or slam",
+            ),
             DeclareLaunchArgument("model", default_value="gz_x500"),
             DeclareLaunchArgument("world", default_value="mapping_test"),
             DeclareLaunchArgument("gz_partition", default_value="px4_sitl"),
             DeclareLaunchArgument("headless", default_value="0"),
             DeclareLaunchArgument("start_qgc", default_value="1"),
             DeclareLaunchArgument("start_rviz", default_value="1"),
-            DeclareLaunchArgument("start_tf", default_value="1"),
-            DeclareLaunchArgument("enable_kiss_icp", default_value="1"),
+            DeclareLaunchArgument(
+                "database_path",
+                default_value=EnvironmentVariable(
+                    "RTABMAP_DATABASE_PATH",
+                    default_value="",
+                ),
+                description=(
+                    "SLAM database path; an empty value creates a timestamped "
+                    "database on the external workspace"
+                ),
+            ),
             DeclareLaunchArgument("dds_agent_port", default_value="8888"),
             DeclareLaunchArgument("dds_agent_verbose", default_value="4"),
             SetEnvironmentVariable(
@@ -110,11 +124,8 @@ def generate_launch_description():
                 "START_RVIZ", LaunchConfiguration("start_rviz")
             ),
             SetEnvironmentVariable(
-                "START_TF", LaunchConfiguration("start_tf")
-            ),
-            SetEnvironmentVariable(
-                "START_KISS_ICP",
-                LaunchConfiguration("enable_kiss_icp"),
+                "RTABMAP_DATABASE_PATH",
+                LaunchConfiguration("database_path"),
             ),
             SetEnvironmentVariable(
                 "DDS_AGENT_PORT", LaunchConfiguration("dds_agent_port")
@@ -124,7 +135,7 @@ def generate_launch_description():
                 LaunchConfiguration("dds_agent_verbose"),
             ),
             ExecuteProcess(
-                cmd=["bash", runner],
+                cmd=["bash", runner, LaunchConfiguration("mode")],
                 output="screen",
                 emulate_tty=True,
             ),

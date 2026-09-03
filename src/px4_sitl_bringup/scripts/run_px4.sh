@@ -4,6 +4,53 @@ set -euo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 package_share="$(cd "$(dirname "$script_path")/.." && pwd)"
 
+usage() {
+  cat <<'EOF'
+Usage: run_px4.sh [simulation|odometry|slam]
+
+  simulation  Start PX4, Gazebo, bridges, and LiDAR visualization.
+  odometry    Add KISS-ICP LiDAR odometry (default).
+  slam        Add KISS-ICP, RTAB-Map, and persistent SLAM visualization.
+EOF
+}
+
+if [[ "$#" -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+PX4_MODE="${1:-${PX4_MODE:-odometry}}"
+
+enable_tf="no"
+enable_kiss_icp="no"
+enable_rtabmap="no"
+kiss_invert_odom_tf="false"
+
+case "$PX4_MODE" in
+  simulation)
+    enable_tf="yes"
+    ;;
+  odometry)
+    enable_tf="yes"
+    enable_kiss_icp="yes"
+    kiss_invert_odom_tf="true"
+    ;;
+  slam)
+    enable_kiss_icp="yes"
+    enable_rtabmap="yes"
+    ;;
+  *)
+    echo "Unknown PX4 mode: $PX4_MODE" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
 PX4_VERSION="${PX4_VERSION:-v1.17.0}"
 PX4_IMAGE="${PX4_IMAGE:-px4-sitl:${PX4_VERSION}}"
 PX4_SOURCE_DIR="${PX4_SOURCE_DIR:-/mnt/px4-workspace/PX4-Autopilot}"
@@ -12,6 +59,15 @@ KISS_ICP_INSTALL_DIR="${KISS_ICP_INSTALL_DIR:-/mnt/px4-workspace/kiss_icp_ws/ins
 KISS_ICP_SETUP="${KISS_ICP_SETUP:-$KISS_ICP_INSTALL_DIR/setup.bash}"
 KISS_ICP_CONFIG="${KISS_ICP_CONFIG:-$KISS_ICP_INSTALL_DIR/kiss_icp/share/kiss_icp/config/config.yaml}"
 KISS_ICP_POINTCLOUD_TOPIC="${KISS_ICP_POINTCLOUD_TOPIC:-/x500/lidar/points}"
+RTABMAP_CONFIG="${RTABMAP_CONFIG:-$package_share/config/rtabmap.yaml}"
+RTABMAP_MAP_DIR="${RTABMAP_MAP_DIR:-/mnt/px4-workspace/rtabmap_maps}"
+RTABMAP_DATABASE_PATH="${RTABMAP_DATABASE_PATH:-$RTABMAP_MAP_DIR/x500_live_$(date +%Y%m%d_%H%M%S).db}"
+SLAM_RVIZ_CONFIG="${SLAM_RVIZ_CONFIG:-$package_share/rviz/x500_slam.rviz}"
+default_rviz_config="$package_share/rviz/x500_lidar.rviz"
+if [[ "$enable_rtabmap" == "yes" ]]; then
+  default_rviz_config="$SLAM_RVIZ_CONFIG"
+fi
+RVIZ_CONFIG="${RVIZ_CONFIG:-$default_rviz_config}"
 PX4_PROJECT_MODELS_DIR="${PX4_PROJECT_MODELS_DIR:-$package_share/models}"
 PX4_PROJECT_WORLDS_DIR="${PX4_PROJECT_WORLDS_DIR:-$package_share/worlds}"
 LIDAR_BRIDGE_SCRIPT="${LIDAR_BRIDGE_SCRIPT:-$package_share/scripts/internal/run_lidar_bridge.sh}"
@@ -24,8 +80,6 @@ GZ_PARTITION="${GZ_PARTITION:-px4_sitl}"
 HEADLESS="${HEADLESS:-0}"
 START_QGC="${START_QGC:-1}"
 START_RVIZ="${START_RVIZ:-1}"
-START_TF="${START_TF:-1}"
-START_KISS_ICP="${START_KISS_ICP:-1}"
 DDS_AGENT_PORT="${DDS_AGENT_PORT:-8888}"
 DDS_AGENT_VERBOSE="${DDS_AGENT_VERBOSE:-4}"
 PX4_CONTAINER="${PX4_CONTAINER_NAME:-px4-sitl}"
@@ -33,6 +87,7 @@ DDS_AGENT_CONTAINER="${DDS_AGENT_CONTAINER_NAME:-px4-dds-agent}"
 QGC_LOG="${QGC_LOG:-/tmp/px4-qgroundcontrol.log}"
 RVIZ_LOG="${RVIZ_LOG:-/tmp/px4-lidar-rviz.log}"
 KISS_ICP_LOG="${KISS_ICP_LOG:-/tmp/px4-kiss-icp.log}"
+RTABMAP_LOG="${RTABMAP_LOG:-/tmp/px4-rtabmap.log}"
 
 docker_command=(docker)
 qgc_pid=""
@@ -40,6 +95,7 @@ qgc_started="no"
 lidar_bridge_pid=""
 tf_bridge_pid=""
 kiss_icp_pid=""
+rtabmap_pid=""
 rviz_pid=""
 rviz_started="no"
 cleanup_started="no"
@@ -64,6 +120,12 @@ kiss_icp_process_ids() {
   # Match both the `ros2 run` wrapper and its native KISS-ICP child process.
   pgrep -u "$(id -u)" -f \
     '(^|[/[:space:]])kiss_icp_node([[:space:]]|$)' || true
+}
+
+rtabmap_process_ids() {
+  # Match both the `ros2 run` wrapper and the native RTAB-Map process.
+  pgrep -u "$(id -u)" -f \
+    '(^|[/[:space:]])rtabmap([[:space:]]|$)' || true
 }
 
 process_is_running() {
@@ -131,6 +193,36 @@ stop_kiss_icp() {
   fi
 }
 
+stop_rtabmap() {
+  local -a process_ids=()
+  local pid
+
+  mapfile -t process_ids < <(rtabmap_process_ids)
+  if [[ "${#process_ids[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  echo "Stopping RTAB-Map and saving the database"
+  kill -INT "${process_ids[@]}" 2>/dev/null || true
+
+  if ! wait_for_processes_to_stop 30 "${process_ids[@]}"; then
+    echo "RTAB-Map did not stop after 30 seconds; requesting termination" >&2
+    kill -TERM "${process_ids[@]}" 2>/dev/null || true
+
+    if ! wait_for_processes_to_stop 5 "${process_ids[@]}"; then
+      for pid in "${process_ids[@]}"; do
+        if process_is_running "$pid"; then
+          kill -KILL "$pid" 2>/dev/null || true
+        fi
+      done
+    fi
+  fi
+
+  if [[ -n "$rtabmap_pid" ]]; then
+    wait "$rtabmap_pid" 2>/dev/null || true
+  fi
+}
+
 start_kiss_icp() (
   # ROS setup files may read unset variables, so nounset is paused while sourcing.
   set +u
@@ -144,11 +236,26 @@ start_kiss_icp() (
     -p base_frame:=lidar_link \
     -p lidar_odom_frame:=odom_lidar \
     -p publish_odom_tf:=true \
-    -p invert_odom_tf:=true \
+    -p "invert_odom_tf:=$kiss_invert_odom_tf" \
     -p publish_debug_clouds:=true \
     -p use_sim_time:=true \
     -p position_covariance:=0.1 \
     -p orientation_covariance:=0.1
+)
+
+start_rtabmap() (
+  # RTAB-Map is installed with ROS and consumes the KISS-ICP overlay topics.
+  set +u
+  source /opt/ros/lyrical/setup.bash
+  source "$KISS_ICP_SETUP"
+  set -u
+
+  exec ros2 run rtabmap_slam rtabmap --ros-args \
+    --remap __ns:=/rtabmap \
+    --params-file "$RTABMAP_CONFIG" \
+    -p "database_path:=$RTABMAP_DATABASE_PATH" \
+    --remap odom:=/kiss/odometry \
+    --remap "scan_cloud:=$KISS_ICP_POINTCLOUD_TOPIC"
 )
 
 cleanup() {
@@ -169,6 +276,7 @@ cleanup() {
     wait "$rviz_pid" 2>/dev/null
   fi
 
+  stop_rtabmap
   stop_kiss_icp
 
   if [[ -n "$tf_bridge_pid" ]] \
@@ -225,11 +333,11 @@ if [[ ! -x "$X500_TF_SCRIPT" ]]; then
   exit 2
 fi
 
-if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
+if [[ "$enable_kiss_icp" == "yes" ]]; then
   if [[ ! -f "$KISS_ICP_SETUP" ]]; then
     echo "KISS-ICP workspace setup not found: $KISS_ICP_SETUP" >&2
     echo "Connect the PX4 workspace and build KISS-ICP first." >&2
-    echo "Set START_KISS_ICP=0 to launch without LiDAR odometry." >&2
+    echo "Use simulation mode to launch without LiDAR odometry." >&2
     exit 2
   fi
 
@@ -238,6 +346,20 @@ if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
     echo "Rebuild the external KISS-ICP workspace before launching." >&2
     exit 2
   fi
+fi
+
+if [[ "$enable_rtabmap" == "yes" ]]; then
+  if [[ ! -f "$RTABMAP_CONFIG" ]]; then
+    echo "RTAB-Map configuration not found: $RTABMAP_CONFIG" >&2
+    exit 2
+  fi
+
+  if [[ ! -f "$SLAM_RVIZ_CONFIG" ]]; then
+    echo "SLAM RViz configuration not found: $SLAM_RVIZ_CONFIG" >&2
+    exit 2
+  fi
+
+  mkdir -p "$(dirname "$RTABMAP_DATABASE_PATH")"
 fi
 
 mapfile -t stale_kiss_icp_pids < <(kiss_icp_process_ids)
@@ -252,6 +374,21 @@ if [[ "${#stale_kiss_icp_pids[@]}" -gt 0 ]]; then
   echo >&2
   echo "Stop the stale session, then run this launcher again:" >&2
   echo "  pkill -TERM -u $(id -u) -f 'kiss_icp_node'" >&2
+  exit 2
+fi
+
+mapfile -t stale_rtabmap_pids < <(rtabmap_process_ids)
+if [[ "${#stale_rtabmap_pids[@]}" -gt 0 ]]; then
+  stale_rtabmap_pid_list="$(
+    IFS=,
+    echo "${stale_rtabmap_pids[*]}"
+  )"
+
+  echo "RTAB-Map is already running from an earlier session:" >&2
+  ps -o pid=,ppid=,stat=,args= -p "$stale_rtabmap_pid_list" >&2
+  echo >&2
+  echo "Stop the stale session, then run this launcher again:" >&2
+  echo "  pkill -INT -u $(id -u) -f 'rtabmap_slam rtabmap'" >&2
   exit 2
 fi
 
@@ -345,7 +482,7 @@ if ! kill -0 "$lidar_bridge_pid" 2>/dev/null; then
   exit 2
 fi
 
-if [[ "$START_TF" == "1" || "$START_TF" == "true" ]]; then
+if [[ "$enable_tf" == "yes" ]]; then
   echo "Starting X500 world-frame TF adapter"
   GZ_PARTITION="$GZ_PARTITION" "$X500_TF_SCRIPT" &
   tf_bridge_pid=$!
@@ -357,10 +494,10 @@ if [[ "$START_TF" == "1" || "$START_TF" == "true" ]]; then
     exit 2
   fi
 else
-  echo "START_TF is disabled; world-frame RViz data may be unavailable."
+  echo "Gazebo ground-truth TF is not used in $PX4_MODE mode."
 fi
 
-if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
+if [[ "$enable_kiss_icp" == "yes" ]]; then
   echo "Starting KISS-ICP LiDAR odometry"
   start_kiss_icp >"$KISS_ICP_LOG" 2>&1 &
   kiss_icp_pid=$!
@@ -374,7 +511,23 @@ if [[ "$START_KISS_ICP" == "1" || "$START_KISS_ICP" == "true" ]]; then
     exit 2
   fi
 else
-  echo "START_KISS_ICP is disabled; LiDAR odometry will not be started."
+  echo "KISS-ICP is not used in $PX4_MODE mode."
+fi
+
+if [[ "$enable_rtabmap" == "yes" ]]; then
+  echo "Starting RTAB-Map live SLAM"
+  echo "Map database: $RTABMAP_DATABASE_PATH"
+  start_rtabmap >"$RTABMAP_LOG" 2>&1 &
+  rtabmap_pid=$!
+
+  sleep 1
+  if ! kill -0 "$rtabmap_pid" 2>/dev/null; then
+    echo "RTAB-Map stopped during startup." >&2
+    echo "Log: $RTABMAP_LOG" >&2
+    tail -n 40 "$RTABMAP_LOG" >&2 || true
+    wait "$rtabmap_pid" 2>/dev/null || true
+    exit 2
+  fi
 fi
 
 if [[ "$graphical" == "yes" \
@@ -401,8 +554,9 @@ fi
 
 if [[ "$graphical" == "yes" \
   && ( "$START_RVIZ" == "1" || "$START_RVIZ" == "true" ) ]]; then
-  echo "Starting RViz for the X500 3D LiDAR"
-  "$LIDAR_RVIZ_SCRIPT" >"$RVIZ_LOG" 2>&1 &
+  echo "Starting RViz for $PX4_MODE mode"
+  LIDAR_RVIZ_CONFIG="$RVIZ_CONFIG" \
+    "$LIDAR_RVIZ_SCRIPT" >"$RVIZ_LOG" 2>&1 &
   rviz_pid=$!
   rviz_started="yes"
   sleep 1
@@ -497,6 +651,7 @@ else
 fi
 
 echo "Starting PX4 $PX4_VERSION with $PX4_SIM_MODEL in $PX4_GZ_WORLD"
+echo "Bringup mode: $PX4_MODE"
 echo "Source and build output: $PX4_SOURCE_DIR"
 if [[ -f "$project_model_file" ]]; then
   echo "Model source: $project_model_file (project-owned, read-only)"
@@ -517,6 +672,12 @@ if [[ -n "$kiss_icp_pid" ]]; then
   echo "KISS-ICP odometry: /kiss/odometry"
   echo "KISS-ICP local map: /kiss/local_map"
   echo "KISS-ICP log: $KISS_ICP_LOG"
+fi
+if [[ -n "$rtabmap_pid" ]]; then
+  echo "RTAB-Map database: $RTABMAP_DATABASE_PATH"
+  echo "RTAB-Map graph: /rtabmap/mapData"
+  echo "RTAB-Map OctoMap: /rtabmap/octomap_binary"
+  echo "RTAB-Map log: $RTABMAP_LOG"
 fi
 if [[ -n "$tf_bridge_pid" ]]; then
   echo "ROS 2 TF chain: world -> base_link -> lidar_link"

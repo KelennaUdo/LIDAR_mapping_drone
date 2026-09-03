@@ -1,57 +1,75 @@
 # RTAB-Map LiDAR SLAM
 
-This checkpoint adds offline graph-based SLAM to the X500 mapping pipeline.
-It replays a recorded 3D LiDAR flight, estimates motion with KISS-ICP, and
-stores RTAB-Map's graph and point-cloud observations in a persistent database.
+The `slam` bringup mode runs the complete live mapping pipeline with one public
+launch file and one public runner.
 
 ## Mental Model
 
-The two mapping tools have different jobs:
+KISS-ICP and RTAB-Map both hold point-cloud data, but their maps have different
+jobs:
 
 ```text
-recorded 3D LiDAR scans
+live 3D LiDAR scans
           |
           v
-      KISS-ICP                 relative motion between scans
+      KISS-ICP                 local geometry for motion estimation
           |
           v
    /kiss/odometry
           |
           v
-      RTAB-Map                 graph, constraints, optimization, database
+      RTAB-Map                 global graph, persistent map, and database
           |
           v
  map -> odom_lidar -> lidar_link
 ```
 
-KISS-ICP answers, "How did the LiDAR move since the previous scans?"
-RTAB-Map answers, "How do all observed places and motion constraints fit
-together, and have we returned to a place seen before?"
+KISS-ICP's local map is temporary working memory used to align the next scan.
+RTAB-Map stores observations from the whole session, relates them through a pose
+graph, and can publish a 3D occupancy map for planning.
 
-A **loop closure** is a constraint created when SLAM recognizes that the
-vehicle has returned to a previously observed place. It lets the graph
-correct drift accumulated while travelling around the loop.
+A **loop closure** is a graph constraint created when SLAM recognizes a
+previously observed place. It allows RTAB-Map to correct drift accumulated
+along the trajectory.
+
+## Bringup Modes
+
+The public runner accepts one mode:
+
+```bash
+./src/px4_sitl_bringup/scripts/run_px4.sh simulation
+./src/px4_sitl_bringup/scripts/run_px4.sh odometry
+./src/px4_sitl_bringup/scripts/run_px4.sh slam
+```
+
+| Mode | Additional perception components |
+| --- | --- |
+| `simulation` | Raw LiDAR visualization and Gazebo ground-truth TF |
+| `odometry` | KISS-ICP local map and LiDAR odometry |
+| `slam` | KISS-ICP, RTAB-Map, SLAM RViz, and a persistent database |
+
+The equivalent ROS launch entry point is:
+
+```bash
+ros2 launch px4_sitl_bringup px4.launch.py mode:=slam
+```
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `config/rtabmap_slam.yaml` | LiDAR-only RTAB-Map parameters |
-| `launch/rtabmap_slam.launch.py` | Starts KISS-ICP, RTAB-Map, and RViz |
-| `launch/record_slam_loop.launch.py` | Records the six topics that define one SLAM experiment |
+| `config/rtabmap.yaml` | LiDAR-only RTAB-Map parameters |
+| `launch/px4.launch.py` | Declares paths, options, and the bringup mode |
 | `rviz/x500_slam.rviz` | Displays the map cloud, graph, odometry, and TF |
-| `scripts/run_rtabmap_slam.sh` | Checks paths, sources workspaces, and starts the launch file |
-| `scripts/run_slam_loop_recording.sh` | Checks the live pipeline and starts the recorder |
+| `scripts/run_px4.sh` | Starts and supervises the selected mode |
 
 All paths above are inside `src/px4_sitl_bringup/`.
 
 ## Clock Requirement
 
-KISS-ICP, RTAB-Map, TF, and RViz must agree about simulation time. The live
-Gazebo-to-ROS bridge therefore publishes Gazebo's clock as ROS 2 `/clock`, and
-each new mapping bag must record that topic with the LiDAR cloud.
-
-The recording and replay timeline is:
+KISS-ICP, RTAB-Map, TF, and RViz must agree about simulation time. The
+Gazebo-to-ROS bridge publishes Gazebo's clock as ROS 2 `/clock`, and all SLAM
+nodes use that clock.
 
 ```text
 Gazebo /clock + Gazebo LiDAR
@@ -60,15 +78,8 @@ Gazebo /clock + Gazebo LiDAR
        ROS 2 clock + PointCloud2
               |
               v
-       clock-complete rosbag
-              |
-              v
-    KISS-ICP + RTAB-Map + RViz
+       KISS-ICP + RTAB-Map
 ```
-
-Recordings without `/clock` are no longer supported. Keeping one clock-native
-workflow avoids hidden timestamp repair logic and makes future experiments
-easier to reproduce.
 
 ## Build
 
@@ -85,137 +96,77 @@ Successful output ends with:
 Summary: 1 package finished
 ```
 
-## Record a Controlled Loop
+## Run Live SLAM
 
-This experiment uses three terminals. Their roles are intentionally separate:
-
-```text
-terminal 1: create the simulated sensor and flight data
-terminal 2: preserve that data in one rosbag
-terminal 3: send your keyboard flight commands
-```
-
-First connect the external workspace:
+Connect the external workspace, then start `slam` mode:
 
 ```bash
 ./scripts/px4_workspace.sh connect
+./src/px4_sitl_bringup/scripts/run_px4.sh slam
 ```
 
-In terminal 1, start PX4 without live KISS-ICP. Odometry will be reconstructed
-from the bag during the offline SLAM run:
-
-```bash
-START_KISS_ICP=0 \
-  ./src/px4_sitl_bringup/scripts/run_px4.sh
-```
-
-After PX4, Gazebo, and the LiDAR bridge are running, start the recorder in
-terminal 2:
-
-```bash
-./src/px4_sitl_bringup/scripts/run_slam_loop_recording.sh
-```
-
-The recorder waits for `/clock`, LiDAR, PX4 odometry and status, and both TF
-topics. It then prints the new timestamped bag path under:
+The launcher creates a timestamped database under:
 
 ```text
-/mnt/px4-workspace/bags/x500_slam_loop_<timestamp>
+/mnt/px4-workspace/rtabmap_maps/
 ```
 
-In terminal 3, start keyboard control:
+Override that path when a named experiment is useful:
+
+```bash
+RTABMAP_DATABASE_PATH=/mnt/px4-workspace/rtabmap_maps/x500_live_test.db \
+  ./src/px4_sitl_bringup/scripts/run_px4.sh slam
+```
+
+In a second terminal, start keyboard control:
 
 ```bash
 ./src/px4_offboard_control/scripts/run_offboard_teleop.sh
 ```
 
-Fly slowly around the arena, return close to the starting position and yaw,
-and hover there briefly. Land first, then press `Ctrl+C` in terminal 2 so
-rosbag can finish its metadata cleanly.
+Wait briefly for the LiDAR pipeline to initialize, fly slowly around the arena,
+return near the starting area, and land. The RViz map should grow while the
+flight is happening.
 
-## Run an Offline Mapping Test
+Stop the teleop program first. Then press `Ctrl+C` in the bringup terminal.
+The supervisor stops RTAB-Map first so it can save the database before Gazebo
+and the LiDAR bridge stop.
 
-Connect the external workspace first:
+## Runtime Outputs
 
-```bash
-./scripts/px4_workspace.sh connect
-```
+| Topic or transform | Meaning |
+| --- | --- |
+| `/x500/lidar/points` | Live 3D LiDAR scans |
+| `/kiss/odometry` | KISS-ICP motion estimate |
+| `/kiss/local_map` | Temporary local geometry used by KISS-ICP |
+| `/rtabmap/mapData` | RTAB-Map graph and map observations |
+| `/rtabmap/octomap_binary` | 3D free/occupied/unknown map for planning |
+| `map -> odom_lidar -> lidar_link` | Corrected SLAM pose chain |
 
-Start the SLAM pipeline in terminal 1. Choose a new database name for each
-experiment:
+## Inspect a Saved Result
 
-```bash
-RTABMAP_DATABASE_PATH=/mnt/px4-workspace/rtabmap_maps/x500_long_loop_01.db \
-  ./src/px4_sitl_bringup/scripts/run_rtabmap_slam.sh
-```
-
-In terminal 2, replay the recorded Gazebo clock and LiDAR cloud. Replace the
-placeholder with the path to a clock-complete mapping bag:
-
-```bash
-source /opt/ros/lyrical/setup.bash
-
-ros2 bag play \
-  /mnt/px4-workspace/bags/<clock-complete-bag> \
-  --topics /clock /x500/lidar/points
-```
-
-After playback finishes, press `Ctrl+C` in terminal 1. RTAB-Map saves the
-database before exiting.
-
-## Inspect the Result
-
-Open the saved database:
+Open a saved database:
 
 ```bash
-rtabmap-databaseViewer \
-  /mnt/px4-workspace/rtabmap_maps/x500_test_02.db
+rtabmap-databaseViewer /mnt/px4-workspace/rtabmap_maps/<database>.db
 ```
 
 When asked whether to use the database parameters, choose **Yes**. To assemble
-the recorded LiDAR observations:
+the LiDAR observations:
 
-1. select **Edit -> View 3D map**;
-2. clear **From RGB-D images**, because this project uses LiDAR scans;
-3. keep **Assemble clouds** and **Regenerate clouds** enabled;
-4. leave **Meshing** disabled for the first inspection;
-5. select **OK**.
+1. Select **Edit -> View 3D map**.
+2. Clear **From RGB-D images**, because this project uses LiDAR scans.
+3. Keep **Assemble clouds** and **Regenerate clouds** enabled.
+4. Leave **Meshing** disabled for the first inspection.
+5. Select **OK**.
 
 The viewer title `Clouds (1 nodes)` means the selected scans were assembled
-into one displayed cloud object. It does not mean that the RTAB-Map database
-contains only one graph node.
+into one displayed cloud object. It does not mean that the database contains
+only one graph node.
 
-## Verified First Result
+## Current Status
 
-Before the old non-clock bag was removed, the `x500_test_02.db` run produced a
-recognizable 3D reconstruction of the mapping arena and saved a database of
-about 13 MB. The database and documentation image preserve that result even
-though the raw bag is no longer kept in the repository.
-
-| Measurement | Result |
-| --- | ---: |
-| Stored positive node IDs | 179 |
-| Connected graph nodes | 60 |
-| Sequential neighbor constraints | 59 |
-| Local-space closure constraints | 1 |
-| Global loop closures | 0 |
-| Connected graph components | 1 |
-| Timing errors during synchronized replay | 0 |
-
-The one local-space closure connects nodes 134 and 149, whose scan timestamps
-are 296 s and 311 s. This is useful evidence that geometric proximity matching
-works, but the 15-second separation makes it a short local revisit rather than
-a deliberate return-to-start loop closure.
-
-## Current Limitations
-
-- The original raw bag was removed during project cleanup.
-- The flight was not designed specifically to test a long loop closure.
-- LiDAR-only operation does not use camera appearance for place recognition.
-- Most graph structure still follows KISS-ICP odometry and sequential links.
-- RTAB-Map settings have not been tuned against a controlled loop flight yet.
-
-The next experiment should improve the input evidence before changing the
-SLAM parameters: record `/clock`, fly a slow loop, return to the same pose and
-yaw, hover there, and then inspect whether RTAB-Map creates a temporally distant
-closure.
+Offline bag playback has already produced recognizable 3D reconstructions of
+the mapping arena. The next verification is a complete live flight in `slam`
+mode. SLAM tuning should only continue if a problem blocks live mapping or the
+future navigation map.

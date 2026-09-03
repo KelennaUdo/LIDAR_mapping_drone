@@ -16,5 +16,5 @@ set +u
 source /opt/ros/lyrical/setup.bash
 set -u
 
-echo "Opening RViz with /x500/lidar/points in frame world"
+echo "Opening RViz with $rviz_config"
 exec rviz2 -d "$rviz_config"

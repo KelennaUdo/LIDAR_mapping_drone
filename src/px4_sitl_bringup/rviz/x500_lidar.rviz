@@ -112,7 +112,7 @@ Visualization Manager:
           Frame: Local
           Offset: 1
           Scale: 1
-          Value: true
+          Value: false
         Position:
           Alpha: 0.3
           Color: 204; 51; 204

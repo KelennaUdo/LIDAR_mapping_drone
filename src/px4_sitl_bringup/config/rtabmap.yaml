@@ -1,6 +1,6 @@
-rtabmap:
+/rtabmap/rtabmap:
   ros__parameters:
-    # Use timestamps from rosbag playback instead of the computer's wall clock.
+    # Use Gazebo simulation time for both live sessions and bag playback.
     use_sim_time: true
 
     # RTAB-Map estimates the LiDAR pose and publishes map -> odom_lidar.

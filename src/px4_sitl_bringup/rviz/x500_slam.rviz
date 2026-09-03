@@ -25,15 +25,39 @@ Visualization Manager:
       Plane Cell Count: 30
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rtabmap_rviz_plugins/MapCloud
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: AxisColor
+      Decay Time: 0
       Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 0; 0
+      Max Intensity: 4096
+      Min Color: 0; 0; 255
+      Min Intensity: 0
       Name: RTAB-Map Cloud
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.02
+      Style: Flat Squares
       Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /rtabmap/mapData
+        Value: /rtabmap/cloud_map
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
     - Class: rtabmap_rviz_plugins/MapGraph
       Enabled: true
@@ -45,6 +69,40 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /rtabmap/mapGraph
       Value: true
+    - Alpha: 0.65
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 160; 165; 170
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: KISS-ICP Local Map
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.015
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /kiss/local_map
+      Use Fixed Frame: true
+      Use rainbow: false
+      Value: false
     - Angle Tolerance: 0.1
       Class: rviz_default_plugins/Odometry
       Enabled: true

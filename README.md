@@ -80,55 +80,57 @@ Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
 See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
 architecture, external build, runtime topics, and storage behavior.
 
-See [docs/RTABMAP_SLAM.md](docs/RTABMAP_SLAM.md) for the offline graph-SLAM
-pipeline, clock-synchronized replay, database workflow, and first
-loop-closure result.
+See [docs/RTABMAP_SLAM.md](docs/RTABMAP_SLAM.md) for the live graph-SLAM
+pipeline, database workflow, and the relationship between KISS-ICP and
+RTAB-Map.
 
 See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
 of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.
 
 ## Run Commands
 
-Connect the external workspace, then start the complete PX4 session:
+Connect the external workspace, then choose a bringup mode:
 
 ```bash
 ./scripts/px4_workspace.sh connect
-./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh simulation
+./src/px4_sitl_bringup/scripts/run_px4.sh odometry
+./src/px4_sitl_bringup/scripts/run_px4.sh slam
 ```
 
-The launcher starts the DDS Agent, LiDAR bridge, KISS-ICP, QGroundControl,
-RViz, PX4 SITL, and Gazebo. The equivalent ROS 2 launch command is:
+All modes start the shared PX4, Gazebo, DDS, LiDAR bridge, and QGroundControl
+runtime. `odometry` adds KISS-ICP, while `slam` adds KISS-ICP and RTAB-Map.
+The equivalent ROS 2 launch command is:
 
 ```bash
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
 
-ros2 launch px4_sitl_bringup px4.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py mode:=slam
 ```
 
 Both commands use the same shell supervisor and request the NVIDIA GPU for
 Gazebo. Press `Ctrl+C` in the launch terminal to stop PX4, Gazebo, the DDS
-Agent, KISS-ICP, and QGroundControl when they were started by that launcher.
+Agent, perception nodes, and QGroundControl when they were started by that launcher.
 Closing only the Gazebo window does not stop the complete session.
 
-KISS-ICP is enabled by default. For a flight-only run:
+The default mode remains `odometry`. Use `simulation` for a flight-only run:
 
 ```bash
-START_KISS_ICP=0 \
-  ./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh simulation
 ```
 
 The project-owned mapping world is now selected automatically:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh odometry
 ```
 
 The original empty PX4 world remains available with:
 
 ```bash
 PX4_GZ_WORLD=default \
-  ./src/px4_sitl_bringup/scripts/run_px4.sh
+  ./src/px4_sitl_bringup/scripts/run_px4.sh odometry
 ```
 
 ## Comparing With the X3 Sandbox

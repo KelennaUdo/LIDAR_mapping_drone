@@ -99,12 +99,12 @@ Summary: 1 package finished
 
 ## Normal Startup
 
-The existing PX4 launcher starts KISS-ICP by default:
+The `odometry` and `slam` modes start KISS-ICP. `odometry` remains the default:
 
 ```bash
 cd /home/kelenna-udo/LIDAR_mapping_drone
 ./scripts/px4_workspace.sh connect
-./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh odometry
 ```
 
 The same workflow is available through ROS launch:
@@ -113,18 +113,17 @@ The same workflow is available through ROS launch:
 source /opt/ros/lyrical/setup.bash
 source /home/kelenna-udo/LIDAR_mapping_drone/install/setup.bash
 
-ros2 launch px4_sitl_bringup px4.launch.py
+ros2 launch px4_sitl_bringup px4.launch.py mode:=odometry
 ```
 
-Disable KISS-ICP for a flight-only test with either entry point:
+Use `simulation` mode for a flight-only test with either entry point:
 
 ```bash
-START_KISS_ICP=0 \
-  ./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh simulation
 ```
 
 ```bash
-ros2 launch px4_sitl_bringup px4.launch.py enable_kiss_icp:=false
+ros2 launch px4_sitl_bringup px4.launch.py mode:=simulation
 ```
 
 Before starting any simulation processes, the launcher checks for a

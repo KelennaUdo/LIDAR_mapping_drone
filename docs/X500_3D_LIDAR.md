@@ -56,10 +56,10 @@ is not edited or replaced.
 
 ## Gazebo-Side Test
 
-Start the normal PX4 session:
+Start the raw simulation mode:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_px4.sh
+./src/px4_sitl_bringup/scripts/run_px4.sh simulation
 ```
 
 In another terminal, inspect the sensor topics:
@@ -154,10 +154,4 @@ To run the complete simulation without automatically opening RViz:
 
 ```bash
 START_RVIZ=0 ./src/px4_sitl_bringup/scripts/run_px4.sh
-```
-
-To temporarily disable the TF adapter for troubleshooting:
-
-```bash
-START_TF=0 ./src/px4_sitl_bringup/scripts/run_px4.sh
 ```
