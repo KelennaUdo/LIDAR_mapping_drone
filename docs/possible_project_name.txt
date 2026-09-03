@@ -1,0 +1,12 @@
+## Revisit Note — Why I Called the Project *Icarus*
+
+I chose **Icarus** because the name works on different levels.
+
+- A drone flies.
+- I went into the project with very ambitious expectations about building almost everything from scratch.
+- As the project developed, I learned that real robotics work often means understanding, integrating, debugging, and validating existing systems rather than reinventing every component.
+- The project also represented a desire to reach beyond what I already knew and push into unfamiliar areas like ROS 2, PX4, SLAM, LiDAR odometry, and autonomy.
+
+So *Icarus* is not just a reference to flight or failure. For me, it represents **ambition, experimentation, confronting limits, and learning through reaching beyond them**.
+
+The name is deliberately **symbolically layered** rather than having one fixed meaning.
