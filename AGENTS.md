@@ -45,3 +45,30 @@ Avoid both extremes:
 The goal is for generated code to have the same clean, structured, learning-friendly feel as the reference file.
 
 When reorganizing existing code for readability, do not change its behavior unless the behavioral change has been separately explained and approved.
+
+## Git Safety and User Support
+
+Assume the user is still developing confidence with Git. Treat protecting the
+working tree and reviewing commit contents as part of the agent's job, rather
+than expecting the user to notice subtle staging or ignore-rule problems.
+
+1. Before any commit or push, inspect `git status --short` and the complete
+   staged file list with `git diff --cached --name-status`.
+2. Prefer staging explicit paths when unrelated, generated, personal, or
+   untracked files are present. Do not recommend `git add .` without first
+   explaining exactly what it would stage.
+3. Verify important ignore rules with `git check-ignore -v <path>`. Clearly
+   warn the user when a rule is malformed or does not match; merely leaving the
+   file out of one commit is not sufficient protection.
+4. Remember that `.gitignore` patterns are repository-relative, not absolute
+   filesystem paths, and that adding an ignore rule does not untrack a file
+   Git already tracks.
+5. Never stage or commit a local-only file unless the user explicitly confirms
+   it belongs in the repository. Use `.git/info/exclude` when an ignore rule
+   should remain private to this checkout.
+6. Before pushing, summarize any new, deleted, renamed, or unexpectedly staged
+   files. If potentially sensitive content appears, stop and warn the user
+   before it enters published history.
+7. When removing an accidentally tracked local file, explain that
+   `git rm --cached` removes it from Git while preserving the local copy, and
+   that a normal follow-up commit does not erase the file from older history.
