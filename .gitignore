@@ -12,4 +12,4 @@ bags/*
 # Odometry comparison plots and CSV files are generated experiment results.
 /tools/odometry_comparison/generated/
 
-/home/kelenna-udo/LIDAR_mapping_drone/docs/possible_project_name.txt
+/docs/possible_project_name.txt
