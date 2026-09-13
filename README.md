@@ -69,6 +69,10 @@ visualization and future planning.
 Complete the machine and external-workspace setup in
 [PX4_SETUP.md](PX4_SETUP.md) first. For the normal live-mapping session:
 
+`/mnt/px4-workspace` is a machine-specific mount point backed by a 30 GB ext4
+filesystem image stored on an external hard drive. It is not part of this Git
+repository and must be mounted before PX4 can run.
+
 ```bash
 ./scripts/px4_workspace.sh connect
 ./src/px4_sitl_bringup/scripts/run_px4.sh slam
