@@ -23,6 +23,9 @@ Comparison against PX4 odometry
         |
         v
 RTAB-Map graph and persistent 3D map
+        |
+        v
+OctoMap occupancy and RViz visualization
 ```
 
 The earlier X3 custom-controller work remains an important learning sandbox
@@ -200,6 +203,26 @@ after a longer flight.
 See [RTABMAP_SLAM.md](RTABMAP_SLAM.md) for the launch sequence, clock
 requirement, database viewer workflow, and measured graph results.
 
+## 7. Live 3D SLAM Checkpoint
+
+![Live 3D SLAM demonstration](media/live_3d_slam_demo.gif)
+
+The complete mapping stack now runs during a live simulated flight. One
+`slam` command starts PX4, Gazebo, the LiDAR bridge, KISS-ICP, RTAB-Map,
+OctoMap visualization, RViz, and QGroundControl. While the X500 moves through
+the arena, the RTAB-Map cloud and occupied-space view grow from the incoming
+LiDAR observations. Ordered shutdown gives RTAB-Map time to save its database.
+
+**This proves:** the flight, sensor, LiDAR odometry, graph-SLAM, occupancy
+visualization, and persistent storage stages work together in one live
+session.
+
+**This does not prove:** autonomous navigation. The drone is not yet selecting
+3D goals or planning and executing collision-free routes from the map.
+
+Music in the demonstration: **Reach The Top** by Shane Ivers —
+[Silverman Sound](https://www.silvermansound.com) — CC BY 4.0.
+
 ## Current Mental Model
 
 The system now has two largely independent ways to describe the same flight:
@@ -215,9 +238,9 @@ Gazebo physics and PX4 sensors          Gazebo 3D LiDAR
               \                              /      |
                +------ comparison tool -----+       v
                                                    RTAB-Map
-                                                      |
-                                                      v
-                                             graph + persistent map
+                                                  /         \
+                                                 v           v
+                                       graph + saved map   OctoMap/RViz
 ```
 
 That independence is useful. Agreement increases confidence in the pipeline;

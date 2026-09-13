@@ -36,13 +36,17 @@ Ubuntu 26.04 host
 ├── NVIDIA Container Toolkit
 │   └── Gives Gazebo access to the RTX 4050
 └── External-drive ext4 image
-    └── /mnt/px4-workspace/PX4-Autopilot
-        ├── PX4 source
-        └── PX4 build output
+    └── /mnt/px4-workspace
+        ├── PX4-Autopilot
+        ├── Micro-XRCE-DDS-Agent
+        ├── kiss_icp_ws
+        └── rtabmap_maps
 ```
 
-The X3 custom-controller sandbox is preserved on
-`feature/telemetry-sensors`. The PX4 X500 workflow is on `feature/px4-sitl`.
+The `main` branch contains the current PX4 X500 live-SLAM checkpoint. The
+experimental navigation prototype is preserved on `feature/3d-navigation`,
+and the earlier X3 custom-controller sandbox remains on
+`feature/telemetry-sensors`.
 
 ## Prompt Symbols
 

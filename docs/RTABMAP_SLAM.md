@@ -48,6 +48,9 @@ The public runner accepts one mode:
 | `odometry` | KISS-ICP local map and LiDAR odometry |
 | `slam` | KISS-ICP, RTAB-Map, SLAM RViz, and a persistent database |
 
+Running `run_px4.sh` without a mode currently selects `odometry`. Use the
+explicit `slam` argument for the complete live-mapping workflow.
+
 The equivalent ROS launch entry point is:
 
 ```bash
@@ -145,6 +148,12 @@ and the LiDAR bridge stop.
 
 ## Inspect a Saved Result
 
+List the databases newest-first:
+
+```bash
+ls -1t /mnt/px4-workspace/rtabmap_maps/*.db | head -n 1
+```
+
 Open a saved database:
 
 ```bash
@@ -166,7 +175,14 @@ only one graph node.
 
 ## Current Status
 
-Offline bag playback has already produced recognizable 3D reconstructions of
-the mapping arena. The next verification is a complete live flight in `slam`
-mode. SLAM tuning should only continue if a problem blocks live mapping or the
-future navigation map.
+A complete live flight in `slam` mode now produces a recognizable 3D
+reconstruction of the mapping arena, a live OctoMap view in RViz, and a
+timestamped database that remains inspectable after shutdown.
+
+![Live SLAM demonstration](media/live_3d_slam_demo.gif)
+
+This establishes the SLAM stack as working infrastructure. The next phase is
+collision-free 3D goal planning and PX4 Offboard execution. Experimental
+navigation work remains preserved on the `feature/3d-navigation` branch, but
+it is not part of the current runtime. Further SLAM tuning should happen only
+when a measured mapping problem blocks that next phase.

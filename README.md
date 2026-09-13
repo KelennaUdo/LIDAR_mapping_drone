@@ -1,148 +1,125 @@
-# PX4 SITL
+# LiDAR Mapping Drone
 
-This branch is a focused learning environment for running PX4 SITL with the
-PX4-supported Gazebo X500 vehicle. PX4 and Gazebo run inside an Ubuntu 24.04
-Docker container while the computer continues to use Ubuntu 26.04.
+This project gives a simulated PX4 X500 drone a live 3D mapping pipeline. The
+drone flies inside a custom Gazebo arena, observes the environment with a
+project-owned 3D LiDAR, estimates its motion with KISS-ICP, and builds a
+persistent map with RTAB-Map.
 
-The custom X3 controller sandbox is preserved on the
-`feature/telemetry-sensors` branch. It is not part of this branch's runtime.
+The current checkpoint is **stable simulated flight and live 3D SLAM**.
+Autonomous 3D navigation is the next phase; the earlier navigation prototype is
+preserved separately on the `feature/3d-navigation` branch.
 
-## Architecture
+## Demo
 
-```text
-ROS 2 telemetry                     Ubuntu 26.04 host
-        |
-        v
-Micro XRCE-DDS Agent                Ubuntu 24.04 Docker container
-        |
-        v
-PX4 SITL                            Ubuntu 24.04 Docker container
-        |
-        v
-Gazebo X500                         Ubuntu 24.04 Docker container
+![Live 3D SLAM demonstration](docs/media/live_3d_slam_demo.gif)
 
-QGroundControl                      Ubuntu 26.04 host, MAVLink supervision
+This 14-second highlight loop shows the Gazebo environment, raw LiDAR returns,
+KISS-ICP odometry, the live OctoMap view, and the final RTAB-Map
+reconstruction. The full 48-second edit adds the complete sequence and music.
 
-Gazebo 3D LiDAR -> KISS-ICP         Ubuntu 26.04 host, LiDAR odometry
-                         |
-                         v
-                     RTAB-Map       Ubuntu 26.04 host, graph-based SLAM
-```
+Music: **Reach The Top** by Shane Ivers —
+[Silverman Sound](https://www.silvermansound.com) — CC BY 4.0.
 
-## Repository Contents
-
-| Path | Purpose |
-| --- | --- |
-| `docker/px4/` | Builds the Ubuntu 24.04 PX4 dependency image |
-| `src/px4_sitl_bringup/` | ROS launch package and Docker runner |
-| `src/px4_offboard_control/` | Minimal ROS 2 Offboard example |
-| `tools/odometry_comparison/` | KISS-ICP and PX4 trajectory evaluation |
-| `PX4_SETUP.md` | Architecture, storage, startup, and cleanup guide |
-
-PX4 source and build output are intentionally stored outside this repository:
+## System at a Glance
 
 ```text
-/mnt/px4-workspace/PX4-Autopilot
+QGroundControl
+      |
+      v
+PX4 SITL in Docker ------> Gazebo X500 flight simulation
+                                  |
+                                  v
+                             3D LiDAR
+                                  |
+                                  v
+                           ros_gz_bridge
+                                  |
+                                  v
+                      ROS 2 PointCloud2
+                                  |
+                                  v
+                             KISS-ICP
+                         LiDAR odometry
+                                  |
+                                  v
+                             RTAB-Map
+                    graph SLAM + saved database
+                         /                \
+                        v                  v
+                 OctoMap in RViz    persistent 3D map
 ```
 
-## Current Checkpoint
+KISS-ICP answers, “How did the LiDAR move between scans?” RTAB-Map uses those
+motion estimates and the scans to assemble a map of the complete session.
+OctoMap converts the result into occupied, free, and unknown 3D space for
+visualization and future planning.
 
-- Docker Engine is installed and verified.
-- NVIDIA Container Toolkit `1.19.1` is installed and registered with Docker.
-- Docker containers can access the NVIDIA RTX 4050.
-- The Ubuntu 24.04 base image is available.
-- A 30 GB ext4 workspace filesystem exists on the external drive.
-- The workspace is mounted read-write at `/mnt/px4-workspace` and write-tested.
-- PX4 `v1.17.0` and all 39 recursive submodules are checked out.
-- Docker image `px4-sitl:v1.17.0` is built.
-- PX4 SITL and the Gazebo X500 launch and fly under QGroundControl.
-- Micro XRCE-DDS Agent `v2.4.3` is built.
-- `px4_msgs release/1.17` is built for ROS 2 Lyrical.
-- Read-only `/fmu/out/...` telemetry is verified in ROS 2.
-- KISS-ICP `v1.3.0` is built and verified against PX4 odometry.
-- Offline RTAB-Map LiDAR SLAM is running with synchronized bag timestamps.
-- The first RTAB-Map database reconstructs the arena and contains one local
-  geometric closure; a deliberate long-loop test is the next checkpoint.
+## What Works Today
 
-See [PX4_SETUP.md](PX4_SETUP.md) before continuing. The setup proceeds through
-small approval checkpoints so every installation and runtime step can be
-inspected and understood.
+- PX4 `v1.17.0` and the Gazebo X500 run with GPU acceleration in Docker.
+- A single simulated 3D LiDAR is mounted on the X500 and publishes at 10 Hz.
+- `ros_gz_bridge` carries its live point cloud into ROS 2.
+- KISS-ICP produces coherent LiDAR odometry that has been compared with PX4.
+- RTAB-Map builds and saves a live 3D reconstruction of the arena.
+- RViz displays the map, graph, odometry, and OctoMap occupancy.
+- Ordered shutdown preserves the timestamped SLAM database.
 
-See [docs/PX4_OFFBOARD_CONTROL.md](docs/PX4_OFFBOARD_CONTROL.md) for the
-Offboard message flow, build command, and simulation-only flight command.
+## Quick Start
 
-See [docs/MAPPING_TEST_WORLD.md](docs/MAPPING_TEST_WORLD.md) for the compact
-Gazebo environment used to develop the future LiDAR and SLAM pipeline.
-
-See [docs/X500_3D_LIDAR.md](docs/X500_3D_LIDAR.md) for the project-owned
-Gazebo sensor model and its Gazebo/ROS 2 point-cloud inspection commands.
-
-See [docs/KISS_ICP_SETUP.md](docs/KISS_ICP_SETUP.md) for the LiDAR odometry
-architecture, external build, runtime topics, and storage behavior.
-
-See [docs/RTABMAP_SLAM.md](docs/RTABMAP_SLAM.md) for the live graph-SLAM
-pipeline, database workflow, and the relationship between KISS-ICP and
-RTAB-Map.
-
-See [docs/PROJECT_JOURNEY.md](docs/PROJECT_JOURNEY.md) for a visual walkthrough
-of the mapping world, 3D LiDAR pipeline, KISS-ICP map, and PX4 comparison.
-
-## Run Commands
-
-Connect the external workspace, then choose a bringup mode:
+Complete the machine and external-workspace setup in
+[PX4_SETUP.md](PX4_SETUP.md) first. For the normal live-mapping session:
 
 ```bash
 ./scripts/px4_workspace.sh connect
-./src/px4_sitl_bringup/scripts/run_px4.sh simulation
-./src/px4_sitl_bringup/scripts/run_px4.sh odometry
 ./src/px4_sitl_bringup/scripts/run_px4.sh slam
 ```
 
-All modes start the shared PX4, Gazebo, DDS, LiDAR bridge, and QGroundControl
-runtime. `odometry` adds KISS-ICP, while `slam` adds KISS-ICP and RTAB-Map.
-The equivalent ROS 2 launch command is:
+Use QGroundControl or the project's teleoperation helper to fly through the
+arena. Press `Ctrl+C` in the launch terminal to stop the complete session and
+save the timestamped RTAB-Map database.
+
+The runner also accepts `simulation` and `odometry`; running it without an
+argument currently selects `odometry`. See
+[the SLAM guide](docs/RTABMAP_SLAM.md) for the mode breakdown.
+
+## View a Saved Map
+
+Databases are written under `/mnt/px4-workspace/rtabmap_maps/`. Find the newest
+one with:
 
 ```bash
-source /opt/ros/lyrical/setup.bash
-source install/setup.bash
-
-ros2 launch px4_sitl_bringup px4.launch.py mode:=slam
+ls -1t /mnt/px4-workspace/rtabmap_maps/*.db | head -n 1
 ```
 
-Both commands use the same shell supervisor and request the NVIDIA GPU for
-Gazebo. Press `Ctrl+C` in the launch terminal to stop PX4, Gazebo, the DDS
-Agent, perception nodes, and QGroundControl when they were started by that launcher.
-Closing only the Gazebo window does not stop the complete session.
-
-The default mode remains `odometry`. Use `simulation` for a flight-only run:
+Open the reported path:
 
 ```bash
-./src/px4_sitl_bringup/scripts/run_px4.sh simulation
+rtabmap-databaseViewer /mnt/px4-workspace/rtabmap_maps/<database>.db
 ```
 
-The project-owned mapping world is now selected automatically:
+Choose **Yes** when asked to use the database parameters, then use
+**Edit → View 3D map**. Clear **From RGB-D images** because this is a
+LiDAR-only map.
 
-```bash
-./src/px4_sitl_bringup/scripts/run_px4.sh odometry
+## Documentation
+
+- [Project journey](docs/PROJECT_JOURNEY.md): visual record of each mapping milestone.
+- [Live RTAB-Map SLAM](docs/RTABMAP_SLAM.md): runtime, outputs, and database workflow.
+- [KISS-ICP setup](docs/KISS_ICP_SETUP.md): LiDAR odometry architecture and validation.
+- [X500 3D LiDAR](docs/X500_3D_LIDAR.md): sensor model, bridge, and frame relationships.
+
+## Next Phase
+
+The next goal is:
+
+```text
+live 3D SLAM
+    -> manually selected 3D goal
+    -> collision-free 3D planning
+    -> PX4 Offboard execution
+    -> reach the goal and hover
 ```
 
-The original empty PX4 world remains available with:
-
-```bash
-PX4_GZ_WORLD=default \
-  ./src/px4_sitl_bringup/scripts/run_px4.sh odometry
-```
-
-## Comparing With the X3 Sandbox
-
-Commit or stash work before changing branches, then use:
-
-```bash
-git switch feature/telemetry-sensors
-```
-
-Return to the PX4 branch with:
-
-```bash
-git switch feature/px4-sitl
-```
+The SLAM stack is working infrastructure for that phase. Navigation will be
+rebuilt deliberately from this checkpoint rather than mixed into the mapping
+pipeline.
